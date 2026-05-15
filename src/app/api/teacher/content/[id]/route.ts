@@ -7,16 +7,16 @@ import path from 'path'
 // DELETE /api/teacher/content/[id] — delete content
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     if (!session?.user || (session.user as any).role !== 'TEACHER') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const teacherId = (session.user as any).id
-    const { id } = params
 
     // Find the content
     const content = await prisma.content.findUnique({ where: { id } })
