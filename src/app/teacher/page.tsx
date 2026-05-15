@@ -23,6 +23,8 @@ export default function TeacherPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [showSubjectForm, setShowSubjectForm] = useState(false)
+  const [subjectForm, setSubjectForm] = useState({ name: '', icon: '📖', color: '#6366f1' })
 
   const [form, setForm] = useState({
     subjectSlug: '', unitId: '', unitName: '', title: '',
@@ -67,6 +69,27 @@ export default function TeacherPage() {
       fetch(`/api/teacher/quests?grade=${grade}`).then(r => r.json()).then(d => setSubjects(d.subjects || []))
     } else {
       alert(data.error || 'Failed to save')
+    }
+  }
+
+  const handleSaveSubject = async () => {
+    if (!subjectForm.name) return alert('Name is required')
+    setSaving(true)
+    const res = await fetch('/api/teacher/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(subjectForm),
+    })
+    const data = await res.json()
+    setSaving(false)
+    if (data.success) {
+      setSaved(true)
+      setShowSubjectForm(false)
+      setSubjectForm({ name: '', icon: '📖', color: '#6366f1' })
+      setTimeout(() => setSaved(false), 3000)
+      fetch(`/api/teacher/quests?grade=${grade}`).then(r => r.json()).then(d => setSubjects(d.subjects || []))
+    } else {
+      alert(data.error || 'Failed to save subject')
     }
   }
 
@@ -124,15 +147,62 @@ export default function TeacherPage() {
           </div>
         </div>
 
-        {/* Add Quest Button */}
-        <motion.button
-          whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-          onClick={() => setShowForm(!showForm)}
-          className="w-full py-3.5 rounded-2xl font-bold text-white flex items-center justify-center gap-2"
-          style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))', boxShadow: '0 4px 20px rgba(255,107,53,0.3)' }}>
-          <Plus size={18} />
-          Add New Quest for Grade {grade}
-        </motion.button>
+        {/* Add Buttons */}
+        <div className="grid grid-cols-2 gap-3">
+          <motion.button
+            whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+            onClick={() => { setShowForm(!showForm); setShowSubjectForm(false) }}
+            className="w-full py-3.5 rounded-2xl font-bold text-white flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))', boxShadow: '0 4px 20px rgba(255,107,53,0.3)' }}>
+            <Plus size={18} /> Add Quest
+          </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+            onClick={() => { setShowSubjectForm(!showSubjectForm); setShowForm(false) }}
+            className="w-full py-3.5 rounded-2xl font-bold text-white flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent))', boxShadow: '0 4px 20px rgba(6,214,160,0.3)' }}>
+            <Plus size={18} /> New Subject
+          </motion.button>
+        </div>
+
+        {/* Subject Form */}
+        <AnimatePresence>
+          {showSubjectForm && (
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              className="glass-card p-5 rounded-2xl space-y-4" style={{ border: '1px solid var(--border-color)' }}>
+              <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>📚 Create New Subject</h2>
+              
+              <div>
+                <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-muted)' }}>NAME *</label>
+                <input placeholder="e.g. History" value={subjectForm.name} onChange={e => setSubjectForm({ ...subjectForm, name: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm"
+                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-muted)' }}>ICON (Emoji)</label>
+                  <input placeholder="📜" value={subjectForm.icon} onChange={e => setSubjectForm({ ...subjectForm, icon: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm"
+                    style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-muted)' }}>THEME COLOR</label>
+                  <input type="color" value={subjectForm.color} onChange={e => setSubjectForm({ ...subjectForm, color: e.target.value })}
+                    className="w-full h-10 p-1 rounded-xl cursor-pointer"
+                    style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }} />
+                </div>
+              </div>
+
+              <button onClick={handleSaveSubject} disabled={saving}
+                className="w-full py-3 rounded-xl font-bold text-white text-sm disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent))' }}>
+                {saving ? '⏳ Saving...' : '✅ Create Subject'}
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Quest Form */}
         <AnimatePresence>
