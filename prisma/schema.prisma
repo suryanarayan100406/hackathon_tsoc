@@ -95,6 +95,21 @@ model Unit {
   subjectId String
   subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   quests    Quest[]
+  contents  Content[]
+}
+
+model Content {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @default("")
+  type        String   @default("PDF") // PDF, VIDEO, AUDIO, DOCUMENT, LINK
+  fileUrl     String   // path or URL
+  fileName    String   @default("")
+  fileSize    Int      @default(0)
+  unitId      String
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdBy   String   // teacher user id
+  createdAt   DateTime @default(now())
 }
 
 model Quest {
