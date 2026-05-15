@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VidyaSpark — Upload Content</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+  <style>
+    :root {
+      --primary:#4f46e5;--primary-dark:#3730a3;--primary-light:#818cf8;
+      --success:#10b981;--warning:#f59e0b;--danger:#ef4444;
+      --bg:#f0f4ff;--card:#ffffff;--sidebar-bg:#1e1b4b;
+      --sidebar-text:#c7d2fe;--text:#1e1b4b;--text-muted:#6b7280;
+      --border:#e0e7ff;--shadow:0 4px 20px rgba(79,70,229,.10);--radius:16px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;}
+
+    /* Sidebar */
+    .sidebar{width:240px;min-height:100vh;background:var(--sidebar-bg);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;z-index:100;transition:transform .3s;}
+    .sidebar-logo{padding:1.5rem 1.25rem;display:flex;align-items:center;gap:.75rem;border-bottom:1px solid rgba(255,255,255,.08);}
+    .logo-mark{width:40px;height:40px;background:var(--primary);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1rem;color:#fff;}
+    .logo-text{color:#fff;font-weight:800;font-size:1.1rem;}.logo-sub{color:var(--sidebar-text);font-size:.72rem;}
+    .sidebar-nav{flex:1;padding:1rem 0;}
+    .nav-item{display:flex;align-items:center;gap:.75rem;padding:.75rem 1.25rem;color:var(--sidebar-text);text-decoration:none;font-weight:600;font-size:.9rem;border-left:3px solid transparent;transition:all .2s;cursor:pointer;}
+    .nav-item:hover{background:rgba(255,255,255,.07);color:#fff;}
+    .nav-item.active{background:rgba(79,70,229,.35);color:#fff;border-left-color:var(--primary-light);}
+    .sidebar-bottom{padding:1rem 1.25rem;border-top:1px solid rgba(255,255,255,.08);}
+    .user-mini{display:flex;align-items:center;gap:.75rem;}
+    .user-avatar{width:36px;height:36px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;}
+    .user-name{color:#fff;font-weight:700;font-size:.85rem;}.user-role{color:var(--sidebar-text);font-size:.72rem;}
+    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;}
+    .mobile-menu-btn{display:none;position:fixed;top:1rem;left:1rem;z-index:200;background:var(--primary);color:#fff;border:none;border-radius:10px;width:40px;height:40px;font-size:1.2rem;cursor:pointer;}
+
+    /* Main */
+    .main-content{margin-left:240px;flex:1;padding:2rem;min-height:100vh;}
+    .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;flex-wrap:wrap;gap:1rem;}
+    .page-header h1{font-size:1.7rem;font-weight:900;}
+    .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.5rem;border:1px solid var(--border);}
+
+    /* Step Wizard */
+    .wizard-steps{display:flex;align-items:center;gap:0;margin-bottom:2rem;overflow-x:auto;padding-bottom:.5rem;}
+    .step{display:flex;align-items:center;gap:.5rem;padding:.6rem 1.1rem;background:#e0e7ff;color:var(--text-muted);font-weight:700;font-size:.85rem;border-radius:0;transition:all .2s;white-space:nowrap;}
+    .step:first-child{border-radius:12px 0 0 12px;}
+    .step:last-child{border-radius:0 12px 12px 0;}
+    .step.active{background:var(--primary);color:#fff;}
+    .step.done{background:#d1fae5;color:#065f46;}
+    .step-num{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;}
+    .step.done .step-num::before{content:'✓';}
+    .step-arrow{color:var(--border);font-size:.9rem;padding:0 .25rem;}
+
+    /* Form */
+    .form-section{display:none;}
+    .form-section.active{display:block;}
+    .form-group{margin-bottom:1.25rem;}
+    label{display:block;font-weight:700;font-size:.88rem;color:var(--text);margin-bottom:.4rem;}
+    label span{color:var(--danger);}
+    input,select,textarea{width:100%;padding:.7rem 1rem;border:2px solid var(--border);border-radius:10px;font-family:'Nunito',sans-serif;font-size:.9rem;color:var(--text);background:var(--card);transition:border-color .2s;outline:none;}
+    input:focus,select:focus,textarea:focus{border-color:var(--primary);}
+    textarea{resize:vertical;min-height:100px;}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;}
+
+    /* File drop zone */
+    .drop-zone{border:2px dashed var(--border);border-radius:12px;padding:2rem;text-align:center;cursor:pointer;transition:all .2s;background:#f8f9ff;}
+    .drop-zone:hover,.drop-zone.dragover{border-color:var(--primary);background:#eff0ff;}
+    .drop-zone-icon{font-size:2.5rem;margin-bottom:.5rem;}
+    .drop-zone p{color:var(--text-muted);font-size:.88rem;}
+    .drop-zone strong{color:var(--primary);}
+    .file-preview{margin-top:.75rem;font-size:.85rem;color:var(--success);font-weight:700;}
+
+    /* Quiz builder */
+    .quiz-question-card{background:#f8f9ff;border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-bottom:1rem;position:relative;}
+    .quiz-question-card h4{font-size:.9rem;font-weight:800;margin-bottom:.75rem;color:var(--primary);}
+    .option-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;}
+    .option-row input[type="radio"]{width:auto;flex-shrink:0;}
+    .option-row input[type="text"]{flex:1;}
+    .correct-label{font-size:.75rem;color:var(--success);font-weight:700;}
+    .remove-q-btn{position:absolute;top:.75rem;right:.75rem;background:var(--danger);color:#fff;border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;}
+
+    /* Buttons */
+    .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.65rem 1.3rem;border-radius:10px;font-weight:700;font-size:.9rem;cursor:pointer;border:none;transition:all .2s;text-decoration:none;}
+    .btn-primary{background:var(--primary);color:#fff;}
+    .btn-primary:hover{background:var(--primary-dark);transform:translateY(-1px);}
+    .btn-success{background:var(--success);color:#fff;}
+    .btn-outline{background:transparent;color:var(--primary);border:2px solid var(--primary);}
+    .btn-outline:hover{background:var(--primary);color:#fff;}
+    .btn-ghost{background:#f0f4ff;color:var(--text-muted);}
+    .btn-ghost:hover{background:var(--border);}
+    .btn-sm{padding:.4rem .9rem;font-size:.82rem;}
+
+    /* Progress upload bar */
+    .upload-progress{margin-top:.75rem;display:none;}
+    .upload-bar-wrap{background:#e0e7ff;border-radius:999px;height:8px;overflow:hidden;}
+    .upload-bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--primary),var(--primary-light));transition:width .3s;}
+
+    /* Toast */
+    .toast{position:fixed;bottom:2rem;right:2rem;background:var(--text);color:#fff;padding:1rem 1.5rem;border-radius:12px;font-weight:700;font-size:.9rem;z-index:9999;transform:translateY(100px);opacity:0;transition:all .3s;display:flex;align-items:center;gap:.75rem;}
+    .toast.show{transform:translateY(0);opacity:1;}
+    .toast.success{background:var(--success);}
+    .toast.error{background:var(--danger);}
+
+    /* Summary card */
+    .summary-row{display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:.9rem;}
+    .summary-row:last-child{border-bottom:none;}
+    .summary-label{color:var(--text-muted);font-weight:600;}
+    .summary-value{font-weight:700;}
+
+    @media(max-width:768px){
+      .sidebar{transform:translateX(-100%);}
+      .sidebar.open{transform:translateX(0);}
+      .sidebar-overlay.show{display:block;}
+      .main-content{margin-left:0;padding:1rem;padding-top:4rem;}
+      .mobile-menu-btn{display:flex;align-items:center;justify-content:center;}
+      .grid-2{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mob-menu-btn">&#9776;</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">VS</div>
+    <div><div class="logo-text">VidyaSpark</div><div class="logo-sub">Teacher Portal</div></div>
+  </div>
+  <nav class="sidebar-nav">
+    <a class="nav-item" href="dashboard.html"><span class="nav-icon">📊</span> Overview</a>
+    <a class="nav-item" href="dashboard.html"><span class="nav-icon">👩‍🎓</span> My Students</a>
+    <a class="nav-item" href="dashboard.html"><span class="nav-icon">📚</span> My Courses</a>
+    <a class="nav-item" href="dashboard.html"><span class="nav-icon">📈</span> Analytics</a>
+    <a class="nav-item active"><span class="nav-icon">⬆️</span> Upload Content</a>
+    <a class="nav-item" id="logout-btn"><span class="nav-icon">🚪</span> Logout</a>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-mini">
+      <div class="user-avatar" id="user-avatar-mini">T</div>
+      <div><div class="user-name" id="user-name-mini">Loading...</div><div class="user-role">Teacher</div></div>
+    </div>
+  </div>
+</aside>
+
+<main class="main-content">
+  <div class="page-header">
+    <div>
+      <h1>⬆️ Upload Content</h1>
+      <p style="color:var(--text-muted);font-size:.9rem;margin-top:.2rem;">Create a new course with lessons and quizzes</p>
+    </div>
+    <a href="dashboard.html" class="btn btn-outline btn-sm">← Back to Dashboard</a>
+  </div>
+
+  <!-- Step Wizard -->
+  <div class="wizard-steps">
+    <div class="step active" id="step-indicator-1"><span class="step-num">1</span> Course Info</div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="step-indicator-2"><span class="step-num">2</span> Lesson Content</div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="step-indicator-3"><span class="step-num">3</span> Quiz Builder</div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="step-indicator-4"><span class="step-num">4</span> Review & Publish</div>
+  </div>
+
+  <div class="card">
+    <!-- ── STEP 1: Course Info ── -->
+    <div class="form-section active" id="step-1">
+      <h2 style="margin-bottom:1.5rem;font-size:1.2rem;">📋 Course Information</h2>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Course Title <span>*</span></label>
+          <input id="course-title" type="text" placeholder="e.g. Algebra Basics">
+        </div>
+        <div class="form-group">
+          <label>Subject <span>*</span></label>
+          <select id="course-subject">
+            <option value="">Select Subject</option>
+            <option value="math">Mathematics</option>
+            <option value="physics">Physics</option>
+            <option value="chemistry">Chemistry</option>
+            <option value="biology">Biology</option>
+            <option value="coding">Coding</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Class <span>*</span></label>
+          <select id="course-class">
+            <option value="">Select Class</option>
+            <option>6</option><option>7</option><option>8</option>
+            <option>9</option><option>10</option><option>11</option><option>12</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Language <span>*</span></label>
+          <select id="course-language">
+            <option value="en">English</option>
+            <option value="hi">Hindi</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Difficulty</label>
+          <select id="course-difficulty">
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Estimated Duration (minutes)</label>
+          <input id="course-duration" type="number" placeholder="e.g. 45" min="5" max="300">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Course Description <span>*</span></label>
+        <textarea id="course-description" placeholder="Briefly describe what students will learn..."></textarea>
+      </div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="goToStep(2)">Next: Lesson Content →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 2: Lesson Content ── -->
+    <div class="form-section" id="step-2">
+      <h2 style="margin-bottom:1.5rem;font-size:1.2rem;">📖 Lesson Content</h2>
+
+      <div class="form-group">
+        <label>Lesson Explanation <span>*</span></label>
+        <textarea id="lesson-explanation" rows="6" placeholder="Write the main lesson content here. Explain concepts clearly for grades 6–12..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Key Points / Summary</label>
+        <textarea id="lesson-keypoints" rows="4" placeholder="• Key point 1&#10;• Key point 2&#10;• Key point 3"></textarea>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label>📹 Upload Video</label>
+          <div class="drop-zone" id="video-drop" onclick="document.getElementById('video-input').click()">
+            <div class="drop-zone-icon">🎬</div>
+            <p>Drop video here or <strong>click to upload</strong></p>
+            <p style="font-size:.75rem;margin-top:.25rem;">MP4, WebM — Max 200MB</p>
+            <div class="file-preview" id="video-preview"></div>
+          </div>
+          <input type="file" id="video-input" accept="video/*" style="display:none;" onchange="handleFile('video',this)">
+          <div class="upload-progress" id="video-progress">
+            <div class="upload-bar-wrap"><div class="upload-bar-fill" id="video-bar" style="width:0%"></div></div>
+            <p style="font-size:.75rem;color:var(--text-muted);margin-top:.25rem;" id="video-progress-text">Uploading...</p>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>📄 Upload PDF Notes</label>
+          <div class="drop-zone" id="pdf-drop" onclick="document.getElementById('pdf-input').click()">
+            <div class="drop-zone-icon">📑</div>
+            <p>Drop PDF here or <strong>click to upload</strong></p>
+            <p style="font-size:.75rem;margin-top:.25rem;">PDF only — Max 20MB</p>
+            <div class="file-preview" id="pdf-preview"></div>
+          </div>
+          <input type="file" id="pdf-input" accept=".pdf" style="display:none;" onchange="handleFile('pdf',this)">
+          <div class="upload-progress" id="pdf-progress">
+            <div class="upload-bar-wrap"><div class="upload-bar-fill" id="pdf-bar" style="width:0%"></div></div>
+            <p style="font-size:.75rem;color:var(--text-muted);margin-top:.25rem;" id="pdf-progress-text">Uploading...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>🔗 Video URL (alternative to upload)</label>
+        <input id="lesson-video-url" type="url" placeholder="https://youtube.com/watch?v=...">
+      </div>
+
+      <div style="display:flex;justify-content:space-between;margin-top:1rem;">
+        <button class="btn btn-ghost" onclick="goToStep(1)">← Back</button>
+        <button class="btn btn-primary" onclick="goToStep(3)">Next: Build Quiz →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 3: Quiz Builder ── -->
+    <div class="form-section" id="step-3">
+      <h2 style="margin-bottom:.5rem;font-size:1.2rem;">📝 Quiz Builder</h2>
+      <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:1.5rem;">Add MCQ questions. Students must score ≥70% to unlock the next level.</p>
+
+      <div class="grid-2" style="margin-bottom:1.5rem;">
+        <div class="form-group">
+          <label>Pass Threshold (%)</label>
+          <input id="quiz-pass" type="number" value="70" min="50" max="100">
+        </div>
+        <div class="form-group">
+          <label>Time Limit (seconds)</label>
+          <input id="quiz-time" type="number" value="120" min="30">
+        </div>
+        <div class="form-group">
+          <label>XP Reward for Passing</label>
+          <input id="quiz-xp" type="number" value="50" min="10">
+        </div>
+        <div class="form-group">
+          <label>Difficulty</label>
+          <select id="quiz-difficulty">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="questions-container">
+        <!-- Questions added here -->
+      </div>
+
+      <button class="btn btn-outline" onclick="addQuestion()" style="width:100%;justify-content:center;margin-bottom:1.5rem;">
+        + Add Question
+      </button>
+
+      <div style="display:flex;justify-content:space-between;">
+        <button class="btn btn-ghost" onclick="goToStep(2)">← Back</button>
+        <button class="btn btn-primary" onclick="goToStep(4)">Next: Review →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 4: Review & Publish ── -->
+    <div class="form-section" id="step-4">
+      <h2 style="margin-bottom:1.5rem;font-size:1.2rem;">🚀 Review & Publish</h2>
+      <div id="summary-content"></div>
+      <div style="margin-top:1.5rem;background:#f0fdf4;border:2px solid #86efac;border-radius:12px;padding:1rem 1.25rem;font-size:.88rem;color:#065f46;">
+        ℹ️ Your course will be submitted for admin review. Once approved, it will appear in students' subject maps.
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:1.5rem;gap:1rem;flex-wrap:wrap;">
+        <button class="btn btn-ghost" onclick="goToStep(3)">← Back</button>
+        <div style="display:flex;gap:.75rem;">
+          <button class="btn btn-outline" onclick="saveDraft()">💾 Save Draft</button>
+          <button class="btn btn-success" onclick="publishCourse()" id="publish-btn">🚀 Submit for Review</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="/firebase/firebase-config.js"></script>
+<script>
+let currentUser = null;
+let questionCount = 0;
+let uploadedFiles = { video: null, pdf: null };
+
+// ── Auth ───────────────────────────────────────────────────────
+firebase.auth().onAuthStateChanged(async (user) => {
+  if (!user) { window.location.href = '/index.html'; return; }
+  currentUser = user;
+  const snap = await db.collection('users').doc(user.uid).get();
+  const profile = snap.data();
+  if (profile.role !== 'teacher') { window.location.href = '/index.html'; return; }
+  document.getElementById('user-name-mini').textContent = profile.name;
+  document.getElementById('user-avatar-mini').textContent = profile.name.charAt(0);
+});
+
+document.getElementById('logout-btn').addEventListener('click', () => {
+  firebase.auth().signOut().then(() => window.location.href = '/index.html');
+});
+document.getElementById('mob-menu-btn').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('show');
+});
+document.getElementById('sidebar-overlay').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+});
+
+// ── Step Navigation ────────────────────────────────────────────
+function goToStep(n) {
+  if (n > 1 && !validateStep(n - 1)) return;
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById('step-' + i).classList.toggle('active', i === n);
+    const ind = document.getElementById('step-indicator-' + i);
+    ind.classList.remove('active','done');
+    if (i === n) ind.classList.add('active');
+    else if (i < n) ind.classList.add('done');
+  }
+  if (n === 4) buildSummary();
+}
+
+function validateStep(n) {
+  if (n === 1) {
+    if (!document.getElementById('course-title').value.trim()) { showToast('Please enter a course title','error'); return false; }
+    if (!document.getElementById('course-subject').value)      { showToast('Please select a subject','error'); return false; }
+    if (!document.getElementById('course-class').value)        { showToast('Please select a class','error'); return false; }
+    if (!document.getElementById('course-description').value.trim()) { showToast('Please add a description','error'); return false; }
+  }
+  if (n === 2) {
+    if (!document.getElementById('lesson-explanation').value.trim()) { showToast('Please add lesson content','error'); return false; }
+  }
+  return true;
+}
+
+// ── Quiz Builder ───────────────────────────────────────────────
+function addQuestion() {
+  questionCount++;
+  const qn = questionCount;
+  const container = document.getElementById('questions-container');
+  const div = document.createElement('div');
+  div.className = 'quiz-question-card';
+  div.id = 'q-' + qn;
+  div.innerHTML = `
+    <button class="remove-q-btn" onclick="removeQuestion(${qn})" title="Remove">✕</button>
+    <h4>Question ${qn}</h4>
+    <div class="form-group">
+      <label>Question Text</label>
+      <input type="text" id="q${qn}-text" placeholder="Type your question here...">
+    </div>
+    <label style="font-size:.83rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;display:block;">Options — select the correct answer:</label>
+    ${[0,1,2,3].map(i => `
+      <div class="option-row">
+        <input type="radio" name="correct-${qn}" value="${i}" id="q${qn}-radio${i}">
+        <input type="text" id="q${qn}-opt${i}" placeholder="Option ${String.fromCharCode(65+i)}">
+        <label class="correct-label" for="q${qn}-radio${i}">✓ Correct</label>
+      </div>
+    `).join('')}
+    <div class="form-group" style="margin-top:.75rem;">
+      <label>Difficulty</label>
+      <select id="q${qn}-diff" style="max-width:180px;">
+        <option value="easy">Easy</option>
+        <option value="medium" selected>Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+    </div>
+  `;
+  container.appendChild(div);
+}
+
+function removeQuestion(n) {
+  const el = document.getElementById('q-' + n);
+  if (el) el.remove();
+}
+
+// ── File Handling ──────────────────────────────────────────────
+function handleFile(type, input) {
+  const file = input.files[0];
+  if (!file) return;
+  uploadedFiles[type] = file;
+  document.getElementById(type + '-preview').textContent = '✅ ' + file.name;
+
+  if (!currentUser) return;
+  const path = `courses/${currentUser.uid}/${Date.now()}_${file.name}`;
+  const ref = storage.ref(path);
+  const task = ref.put(file);
+
+  const progressEl = document.getElementById(type + '-progress');
+  const barEl = document.getElementById(type + '-bar');
+  const textEl = document.getElementById(type + '-progress-text');
+  progressEl.style.display = 'block';
+
+  task.on('state_changed',
+    snap => {
+      const pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100);
+      barEl.style.width = pct + '%';
+      textEl.textContent = `Uploading... ${pct}%`;
+    },
+    err => { textEl.textContent = '❌ Upload failed: ' + err.message; },
+    async () => {
+      const url = await task.snapshot.ref.getDownloadURL();
+      uploadedFiles[type + '_url'] = url;
+      textEl.textContent = '✅ Uploaded!';
+      barEl.style.width = '100%';
+    }
+  );
+}
+
+// Drag-drop
+['video-drop','pdf-drop'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('dragover'); });
+  el.addEventListener('dragleave', () => el.classList.remove('dragover'));
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.classList.remove('dragover');
+    const type = id.includes('video') ? 'video' : 'pdf';
+    const fakeInput = { files: e.dataTransfer.files };
+    handleFile(type, fakeInput);
+  });
+});
+
+// ── Summary Builder ────────────────────────────────────────────
+function buildSummary() {
+  const questions = [];
+  document.querySelectorAll('.quiz-question-card').forEach(card => {
+    const n = card.id.replace('q-','');
+    const text = document.getElementById('q'+n+'-text')?.value;
+    if (text) questions.push(text);
+  });
+
+  document.getElementById('summary-content').innerHTML = `
+    <div style="margin-bottom:1.25rem;">
+      <h3 style="font-size:.95rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;">Course Details</h3>
+      <div class="summary-row"><span class="summary-label">Title</span><span class="summary-value">${document.getElementById('course-title').value}</span></div>
+      <div class="summary-row"><span class="summary-label">Subject</span><span class="summary-value">${document.getElementById('course-subject').value}</span></div>
+      <div class="summary-row"><span class="summary-label">Class</span><span class="summary-value">Class ${document.getElementById('course-class').value}</span></div>
+      <div class="summary-row"><span class="summary-label">Language</span><span class="summary-value">${document.getElementById('course-language').value === 'en' ? 'English' : 'Hindi'}</span></div>
+      <div class="summary-row"><span class="summary-label">Difficulty</span><span class="summary-value">${document.getElementById('course-difficulty').value}</span></div>
+    </div>
+    <div style="margin-bottom:1.25rem;">
+      <h3 style="font-size:.95rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;">Lesson</h3>
+      <div class="summary-row"><span class="summary-label">Content</span><span class="summary-value">${document.getElementById('lesson-explanation').value.substring(0,80)}...</span></div>
+      <div class="summary-row"><span class="summary-label">Video</span><span class="summary-value">${uploadedFiles.video_url ? '✅ Uploaded' : document.getElementById('lesson-video-url').value || '—'}</span></div>
+      <div class="summary-row"><span class="summary-label">PDF Notes</span><span class="summary-value">${uploadedFiles.pdf_url ? '✅ Uploaded' : '—'}</span></div>
+    </div>
+    <div>
+      <h3 style="font-size:.95rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;">Quiz</h3>
+      <div class="summary-row"><span class="summary-label">Questions</span><span class="summary-value">${questions.length}</span></div>
+      <div class="summary-row"><span class="summary-label">Pass Mark</span><span class="summary-value">${document.getElementById('quiz-pass').value}%</span></div>
+      <div class="summary-row"><span class="summary-label">XP Reward</span><span class="summary-value">${document.getElementById('quiz-xp').value} XP</span></div>
+      <div class="summary-row"><span class="summary-label">Time Limit</span><span class="summary-value">${document.getElementById('quiz-time').value}s</span></div>
+    </div>
+  `;
+}
+
+// ── Collect Questions ──────────────────────────────────────────
+function collectQuestions() {
+  const questions = [];
+  document.querySelectorAll('.quiz-question-card').forEach(card => {
+    const n = card.id.replace('q-','');
+    const text = document.getElementById('q'+n+'-text')?.value;
+    if (!text) return;
+    const options = [0,1,2,3].map(i => document.getElementById('q'+n+'-opt'+i)?.value || '');
+    const correctRadio = card.querySelector(`input[name="correct-${n}"]:checked`);
+    const answer = correctRadio ? parseInt(correctRadio.value) : 0;
+    const difficulty = document.getElementById('q'+n+'-diff')?.value || 'medium';
+    questions.push({ question: text, options, answer, difficulty });
+  });
+  return questions;
+}
+
+// ── Save Draft ─────────────────────────────────────────────────
+async function saveDraft() {
+  await saveToDB(false);
+}
+
+// ── Publish ────────────────────────────────────────────────────
+async function publishCourse() {
+  await saveToDB(true);
+}
+
+async function saveToDB(submit) {
+  if (!currentUser) { showToast('Not authenticated','error'); return; }
+  const btn = document.getElementById('publish-btn');
+  btn.disabled = true; btn.textContent = '⏳ Saving...';
+
+  try {
+    const questions = collectQuestions();
+    const courseData = {
+      title: document.getElementById('course-title').value,
+      subject: document.getElementById('course-subject').value,
+      class: document.getElementById('course-class').value,
+      language: document.getElementById('course-language').value,
+      difficulty: document.getElementById('course-difficulty').value,
+      duration: parseInt(document.getElementById('course-duration').value)||45,
+      description: document.getElementById('course-description').value,
+      lessonContent: document.getElementById('lesson-explanation').value,
+      lessonKeypoints: document.getElementById('lesson-keypoints').value,
+      videoUrl: uploadedFiles.video_url || document.getElementById('lesson-video-url').value || '',
+      pdfUrl: uploadedFiles.pdf_url || '',
+      teacherId: currentUser.uid,
+      approved: false,
+      draft: !submit,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      levels: [
+        { id:'l1', title: document.getElementById('course-title').value, type:'lesson', order:1 },
+        { id:'q1', title: 'Chapter Quiz', type:'quiz', order:2 },
+      ],
+    };
+
+    const courseRef = await db.collection('courses').add(courseData);
+
+    if (questions.length > 0) {
+      await db.collection('quizzes').add({
+        courseId: courseRef.id,
+        title: courseData.title + ' — Quiz',
+        subject: courseData.subject,
+        class: courseData.class,
+        passMark: parseInt(document.getElementById('quiz-pass').value),
+        xpReward: parseInt(document.getElementById('quiz-xp').value),
+        timeLimit: parseInt(document.getElementById('quiz-time').value),
+        difficulty: document.getElementById('quiz-difficulty').value,
+        questions,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    showToast(submit ? '🚀 Course submitted for review!' : '💾 Draft saved!', 'success');
+    if (submit) setTimeout(() => window.location.href = 'dashboard.html', 2000);
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '🚀 Submit for Review';
+  }
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// Add one empty question by default
+window.addEventListener('load', () => addQuestion());
+</script>
+</body>
+</html>

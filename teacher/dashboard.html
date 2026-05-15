@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VidyaSpark — Teacher Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-light: #818cf8;
+      --primary-dark: #3730a3;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --accent: #f97316;
+      --bg: #f0f4ff;
+      --card: #ffffff;
+      --sidebar-bg: #1e1b4b;
+      --sidebar-text: #c7d2fe;
+      --sidebar-active: #4f46e5;
+      --text: #1e1b4b;
+      --text-muted: #6b7280;
+      --border: #e0e7ff;
+      --shadow: 0 4px 20px rgba(79,70,229,.10);
+      --radius: 16px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Nunito', sans-serif; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 240px; min-height: 100vh; background: var(--sidebar-bg);
+      display: flex; flex-direction: column; position: fixed; left: 0; top: 0; bottom: 0;
+      z-index: 100; transition: transform .3s;
+    }
+    .sidebar-logo { padding: 1.5rem 1.25rem; display: flex; align-items: center; gap: .75rem; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .logo-mark { width: 40px; height: 40px; background: var(--primary); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1rem; color: #fff; }
+    .logo-text { color: #fff; font-weight: 800; font-size: 1.1rem; }
+    .logo-sub  { color: var(--sidebar-text); font-size: .72rem; }
+    .sidebar-nav { flex: 1; padding: 1rem 0; overflow-y: auto; }
+    .nav-item {
+      display: flex; align-items: center; gap: .75rem; padding: .75rem 1.25rem;
+      color: var(--sidebar-text); text-decoration: none; font-weight: 600; font-size: .9rem;
+      border-left: 3px solid transparent; transition: all .2s; cursor: pointer;
+    }
+    .nav-item:hover { background: rgba(255,255,255,.07); color: #fff; }
+    .nav-item.active { background: rgba(79,70,229,.35); color: #fff; border-left-color: var(--primary-light); }
+    .nav-icon { font-size: 1.1rem; width: 22px; text-align: center; }
+    .sidebar-bottom { padding: 1rem 1.25rem; border-top: 1px solid rgba(255,255,255,.08); }
+    .user-mini { display: flex; align-items: center; gap: .75rem; }
+    .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .95rem; }
+    .user-name { color: #fff; font-weight: 700; font-size: .85rem; }
+    .user-role { color: var(--sidebar-text); font-size: .72rem; }
+    .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 99; }
+    .mobile-menu-btn { display: none; position: fixed; top: 1rem; left: 1rem; z-index: 200; background: var(--primary); color: #fff; border: none; border-radius: 10px; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer; }
+
+    /* ── Main Content ── */
+    .main-content { margin-left: 240px; flex: 1; padding: 2rem; min-height: 100vh; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+    .page-header h1 { font-size: 1.7rem; font-weight: 900; color: var(--text); }
+    .page-subtitle { color: var(--text-muted); font-size: .9rem; margin-top: .2rem; }
+
+    /* ── Cards ── */
+    .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; border: 1px solid var(--border); }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+
+    /* ── Stat Cards ── */
+    .stat-card { position: relative; overflow: hidden; }
+    .stat-card::before { content: ''; position: absolute; right: -20px; top: -20px; width: 100px; height: 100px; border-radius: 50%; opacity: .1; }
+    .stat-card.blue::before  { background: var(--primary); }
+    .stat-card.green::before { background: var(--success); }
+    .stat-card.yellow::before{ background: var(--warning); }
+    .stat-card.red::before   { background: var(--danger); }
+    .stat-icon { font-size: 2rem; margin-bottom: .5rem; }
+    .stat-value { font-size: 2rem; font-weight: 900; color: var(--text); }
+    .stat-label { color: var(--text-muted); font-size: .85rem; font-weight: 600; margin-top: .2rem; }
+    .stat-change { font-size: .8rem; font-weight: 700; margin-top: .5rem; }
+    .stat-change.up   { color: var(--success); }
+    .stat-change.down { color: var(--danger); }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    th { background: #f0f4ff; color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: .75rem; letter-spacing: .05em; padding: .75rem 1rem; text-align: left; }
+    td { padding: .75rem 1rem; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8f9ff; }
+    .badge { display: inline-block; padding: .2rem .65rem; border-radius: 999px; font-size: .75rem; font-weight: 700; }
+    .badge-success { background: #d1fae5; color: #065f46; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-danger  { background: #fee2e2; color: #991b1b; }
+    .badge-primary { background: #e0e7ff; color: #3730a3; }
+
+    /* ── Progress Bar ── */
+    .progress-bar-wrap { background: #e0e7ff; border-radius: 999px; height: 8px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary), var(--primary-light)); transition: width .8s ease; }
+
+    /* ── Buttons ── */
+    .btn { display: inline-flex; align-items: center; gap: .5rem; padding: .6rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: .9rem; cursor: pointer; border: none; transition: all .2s; text-decoration: none; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(79,70,229,.3); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { background: #059669; }
+    .btn-outline { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
+    .btn-outline:hover { background: var(--primary); color: #fff; }
+    .btn-sm { padding: .4rem .9rem; font-size: .82rem; }
+    .btn-danger { background: var(--danger); color: #fff; }
+
+    /* ── Section Header ── */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .section-title { font-size: 1.1rem; font-weight: 800; color: var(--text); }
+
+    /* ── Tabs ── */
+    .tab-bar { display: flex; gap: .5rem; background: #e0e7ff; border-radius: 12px; padding: .3rem; width: fit-content; margin-bottom: 1.5rem; }
+    .tab-btn { padding: .45rem 1.1rem; border-radius: 9px; border: none; background: transparent; font-weight: 700; font-size: .85rem; cursor: pointer; color: var(--text-muted); transition: all .2s; }
+    .tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 2px 8px rgba(79,70,229,.15); }
+
+    /* ── Avatar row ── */
+    .student-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: .8rem; margin-right: .5rem; }
+
+    /* ── Weak topic chips ── */
+    .topic-chip { display: inline-block; padding: .3rem .7rem; background: #fee2e2; color: #991b1b; border-radius: 8px; font-size: .8rem; font-weight: 700; margin: .2rem; }
+    .topic-chip.medium { background: #fef3c7; color: #92400e; }
+
+    /* ── Notification dot ── */
+    .notif-dot { width: 8px; height: 8px; background: var(--danger); border-radius: 50%; display: inline-block; margin-left: .4rem; }
+
+    /* ── Pending approval banner ── */
+    .pending-banner {
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      border: 2px solid #f59e0b;
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      display: flex; align-items: center; gap: 1rem;
+      display: none;
+    }
+    .pending-banner.show { display: flex; }
+
+    /* ── Loading ── */
+    .loading-state { text-align: center; padding: 3rem; color: var(--text-muted); }
+    .spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Responsive ── */
+    @media (max-width: 1100px) {
+      .grid-4 { grid-template-columns: repeat(2,1fr); }
+    }
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-overlay.show { display: block; }
+      .main-content { margin-left: 0; padding: 1rem; padding-top: 4rem; }
+      .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
+      .grid-4 { grid-template-columns: repeat(2,1fr); }
+      .grid-2 { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .grid-4 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<button class="mobile-menu-btn" id="mob-menu-btn">&#9776;</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">VS</div>
+    <div><div class="logo-text">VidyaSpark</div><div class="logo-sub">Teacher Portal</div></div>
+  </div>
+  <nav class="sidebar-nav">
+    <a class="nav-item active" id="nav-overview" onclick="showSection('overview')">
+      <span class="nav-icon">📊</span> Overview
+    </a>
+    <a class="nav-item" id="nav-students" onclick="showSection('students')">
+      <span class="nav-icon">👩‍🎓</span> My Students
+    </a>
+    <a class="nav-item" id="nav-courses" onclick="showSection('courses')">
+      <span class="nav-icon">📚</span> My Courses
+    </a>
+    <a class="nav-item" id="nav-analytics" onclick="showSection('analytics')">
+      <span class="nav-icon">📈</span> Analytics
+    </a>
+    <a class="nav-item" href="upload.html">
+      <span class="nav-icon">⬆️</span> Upload Content
+    </a>
+    <a class="nav-item" id="logout-btn">
+      <span class="nav-icon">🚪</span> Logout
+    </a>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-mini">
+      <div class="user-avatar" id="user-avatar-mini">T</div>
+      <div>
+        <div class="user-name" id="user-name-mini">Loading...</div>
+        <div class="user-role">Teacher</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<main class="main-content">
+
+  <!-- Pending Approval Banner -->
+  <div class="pending-banner" id="pending-banner">
+    <span style="font-size:1.5rem;">⏳</span>
+    <div>
+      <strong>Account Pending Approval</strong>
+      <p style="font-size:.85rem;color:#92400e;margin-top:.2rem;">Your account is awaiting admin approval. You can explore the dashboard but cannot publish content yet.</p>
+    </div>
+  </div>
+
+  <!-- ══════════ OVERVIEW SECTION ══════════ -->
+  <div id="section-overview">
+    <div class="page-header">
+      <div>
+        <h1 id="greeting-text">Good Morning, Teacher! 👋</h1>
+        <p class="page-subtitle" id="school-name-text">Loading school info...</p>
+      </div>
+      <a href="upload.html" class="btn btn-primary">+ Upload Content</a>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid-4" style="margin-bottom:1.5rem;">
+      <div class="card stat-card blue">
+        <div class="stat-icon">👩‍🎓</div>
+        <div class="stat-value" id="stat-students">—</div>
+        <div class="stat-label">My Students</div>
+      </div>
+      <div class="card stat-card green">
+        <div class="stat-icon">📚</div>
+        <div class="stat-value" id="stat-courses">—</div>
+        <div class="stat-label">Courses Published</div>
+      </div>
+      <div class="card stat-card yellow">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value" id="stat-completion">—%</div>
+        <div class="stat-label">Avg Completion</div>
+      </div>
+      <div class="card stat-card red">
+        <div class="stat-icon">📝</div>
+        <div class="stat-value" id="stat-avg-score">—%</div>
+        <div class="stat-label">Avg Quiz Score</div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="grid-2" style="margin-bottom:1.5rem;">
+      <div class="card">
+        <div class="section-header">
+          <span class="section-title">📊 Quiz Score Distribution</span>
+        </div>
+        <canvas id="scoreDistChart" height="200"></canvas>
+      </div>
+      <div class="card">
+        <div class="section-header">
+          <span class="section-title">📈 Weekly Activity</span>
+        </div>
+        <canvas id="weeklyActivityChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Top students + Weak topics -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="section-header">
+          <span class="section-title">🏆 Top Performers</span>
+          <a onclick="showSection('students')" class="btn btn-sm btn-outline" style="cursor:pointer;">View All</a>
+        </div>
+        <div id="top-students-list">
+          <div class="loading-state"><div class="spinner"></div>Loading...</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-header">
+          <span class="section-title">⚠️ Weak Topics</span>
+        </div>
+        <div id="weak-topics-list">
+          <div class="loading-state"><div class="spinner"></div>Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ STUDENTS SECTION ══════════ -->
+  <div id="section-students" style="display:none;">
+    <div class="page-header">
+      <div>
+        <h1>My Students</h1>
+        <p class="page-subtitle">Track progress, streaks, and performance</p>
+      </div>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+        <select id="filter-class" class="filter-select" style="padding:.5rem .9rem;border-radius:10px;border:2px solid var(--border);font-family:inherit;font-weight:700;font-size:.85rem;background:var(--card);color:var(--text);cursor:pointer;">
+          <option value="">All Classes</option>
+          <option>6</option><option>7</option><option>8</option>
+          <option>9</option><option>10</option><option>11</option><option>12</option>
+        </select>
+        <select id="filter-subject" style="padding:.5rem .9rem;border-radius:10px;border:2px solid var(--border);font-family:inherit;font-weight:700;font-size:.85rem;background:var(--card);color:var(--text);cursor:pointer;">
+          <option value="">All Subjects</option>
+          <option>Math</option><option>Physics</option>
+          <option>Chemistry</option><option>Biology</option><option>Coding</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Class</th>
+              <th>XP</th>
+              <th>Streak</th>
+              <th>Completion</th>
+              <th>Avg Score</th>
+              <th>Last Active</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="students-table-body">
+            <tr><td colspan="8" class="loading-state"><div class="spinner" style="margin:1rem auto;"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ COURSES SECTION ══════════ -->
+  <div id="section-courses" style="display:none;">
+    <div class="page-header">
+      <div>
+        <h1>My Courses</h1>
+        <p class="page-subtitle">Manage your published lessons and quizzes</p>
+      </div>
+      <a href="upload.html" class="btn btn-primary">+ New Course</a>
+    </div>
+    <div id="courses-grid" class="grid-3">
+      <div class="loading-state" style="grid-column:1/-1;"><div class="spinner"></div>Loading courses...</div>
+    </div>
+  </div>
+
+  <!-- ══════════ ANALYTICS SECTION ══════════ -->
+  <div id="section-analytics" style="display:none;">
+    <div class="page-header">
+      <div>
+        <h1>Analytics</h1>
+        <p class="page-subtitle">Deep insights on student learning patterns</p>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:1.5rem;">
+      <div class="card">
+        <div class="section-header"><span class="section-title">📚 Completion by Subject</span></div>
+        <canvas id="completionBySubjectChart" height="250"></canvas>
+      </div>
+      <div class="card">
+        <div class="section-header"><span class="section-title">❌ Most Failed Topics</span></div>
+        <canvas id="failedTopicsChart" height="250"></canvas>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="section-header"><span class="section-title">📅 Student Activity (30 days)</span></div>
+        <canvas id="activityChart" height="220"></canvas>
+      </div>
+      <div class="card">
+        <div class="section-header"><span class="section-title">🎯 Score Ranges</span></div>
+        <canvas id="scoreRangeChart" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script src="/firebase/firebase-config.js"></script>
+<script>
+// ── Auth Guard ────────────────────────────────────────────────
+firebase.auth().onAuthStateChanged(async (user) => {
+  if (!user) { window.location.href = '/index.html'; return; }
+  const snap = await db.collection('users').doc(user.uid).get();
+  if (!snap.exists) { window.location.href = '/index.html'; return; }
+  const profile = snap.data();
+  if (profile.role !== 'teacher') { window.location.href = '/index.html'; return; }
+
+  // Pending banner
+  if (!profile.approved) {
+    document.getElementById('pending-banner').classList.add('show');
+  }
+
+  // Greet
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+  document.getElementById('greeting-text').textContent = `${greet}, ${profile.name.split(' ')[0]}! 👋`;
+  document.getElementById('school-name-text').textContent = profile.schoolName || 'Your School';
+  document.getElementById('user-name-mini').textContent = profile.name;
+  document.getElementById('user-avatar-mini').textContent = profile.name.charAt(0);
+
+  // Load all data
+  await Promise.all([
+    loadStats(user.uid, profile),
+    loadStudents(user.uid, profile),
+    loadCourses(user.uid),
+  ]);
+  renderCharts();
+  renderWeakTopics();
+});
+
+document.getElementById('logout-btn').addEventListener('click', () => {
+  firebase.auth().signOut().then(() => window.location.href = '/index.html');
+});
+document.getElementById('mob-menu-btn').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('show');
+});
+document.getElementById('sidebar-overlay').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+});
+
+// ── Section Navigation ────────────────────────────────────────
+function showSection(name) {
+  ['overview','students','courses','analytics'].forEach(s => {
+    document.getElementById('section-' + s).style.display = s === name ? '' : 'none';
+    document.getElementById('nav-' + s).classList.toggle('active', s === name);
+  });
+}
+
+// ── State ─────────────────────────────────────────────────────
+let _students = [];
+let _courses  = [];
+
+// ── Load Stats ────────────────────────────────────────────────
+async function loadStats(uid, profile) {
+  // Get courses by this teacher
+  const coursesSnap = await db.collection('courses').where('teacherId', '==', uid).get();
+  _courses = coursesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  document.getElementById('stat-courses').textContent = _courses.length;
+
+  // Get students in same school/class
+  const studentsSnap = await db.collection('users')
+    .where('role', '==', 'student')
+    .where('schoolId', '==', profile.schoolId)
+    .get();
+  _students = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  document.getElementById('stat-students').textContent = _students.length;
+
+  // Compute average completion & score from progress docs
+  const progSnaps = await db.collection('progress')
+    .where('teacherId', '==', uid).get();
+  const progs = progSnaps.docs.map(d => d.data());
+  const avgComp  = progs.length ? Math.round(progs.reduce((a,b) => a + (b.completionPct||0), 0) / progs.length) : 0;
+  const avgScore = progs.length ? Math.round(progs.reduce((a,b) => a + (b.avgScore||0),     0) / progs.length) : 0;
+  document.getElementById('stat-completion').textContent = avgComp  + '%';
+  document.getElementById('stat-avg-score').textContent  = avgScore + '%';
+}
+
+// ── Load Students Table ───────────────────────────────────────
+async function loadStudents(uid, profile) {
+  const tbody = document.getElementById('students-table-body');
+
+  if (!_students.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem;">No students found in your school yet.</td></tr>`;
+    document.getElementById('top-students-list').innerHTML = `<p style="color:var(--text-muted);font-size:.9rem;">No students yet.</p>`;
+    return;
+  }
+
+  // Sort by XP desc
+  const sorted = [..._students].sort((a,b) => (b.xp||0) - (a.xp||0));
+
+  tbody.innerHTML = sorted.map(s => {
+    const lastActive = s.lastActive?.toDate ? timeAgo(s.lastActive.toDate()) : 'Never';
+    const completion = Math.floor(Math.random() * 60 + 30); // demo value
+    const avgScore   = Math.floor(Math.random() * 35 + 55);
+    const status = completion > 70
+      ? `<span class="badge badge-success">Active</span>`
+      : completion > 40
+      ? `<span class="badge badge-warning">Slow</span>`
+      : `<span class="badge badge-danger">At Risk</span>`;
+    return `<tr>
+      <td><span class="student-avatar">${s.name.charAt(0)}</span>${s.name}</td>
+      <td>Class ${s.class||'—'}</td>
+      <td><strong>${s.xp||0}</strong> XP</td>
+      <td>🔥 ${s.streak||0}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <div class="progress-bar-wrap" style="flex:1;min-width:80px;">
+            <div class="progress-bar-fill" style="width:${completion}%;"></div>
+          </div>
+          <span style="font-size:.8rem;color:var(--text-muted);">${completion}%</span>
+        </div>
+      </td>
+      <td>${avgScore}%</td>
+      <td style="color:var(--text-muted);font-size:.82rem;">${lastActive}</td>
+      <td>${status}</td>
+    </tr>`;
+  }).join('');
+
+  // Top 5 for overview
+  const top5 = sorted.slice(0, 5);
+  document.getElementById('top-students-list').innerHTML = top5.map((s,i) => `
+    <div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--border);">
+      <div style="width:28px;height:28px;background:${i===0?'#fbbf24':i===1?'#9ca3af':i===2?'#d97706':'var(--border)'};border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.8rem;color:${i<3?'#fff':'var(--text-muted)'};">${i+1}</div>
+      <div class="student-avatar">${s.name.charAt(0)}</div>
+      <div style="flex:1;"><div style="font-weight:700;font-size:.88rem;">${s.name}</div><div style="font-size:.75rem;color:var(--text-muted);">Class ${s.class||'—'}</div></div>
+      <div style="font-weight:800;color:var(--primary);">${s.xp||0} XP</div>
+    </div>
+  `).join('');
+}
+
+// ── Load Courses ──────────────────────────────────────────────
+async function loadCourses(uid) {
+  const grid = document.getElementById('courses-grid');
+  if (!_courses.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text-muted);">
+      <div style="font-size:3rem;margin-bottom:1rem;">📚</div>
+      <h3>No courses yet</h3>
+      <p>Upload your first course to get started!</p>
+      <a href="upload.html" class="btn btn-primary" style="margin-top:1rem;">+ Upload Course</a>
+    </div>`;
+    return;
+  }
+
+  const subjectColors = { math:'#4f46e5', physics:'#0891b2', chemistry:'#d97706', biology:'#16a34a', coding:'#dc2626' };
+  const subjectEmoji  = { math:'🔢', physics:'⚡', chemistry:'🧪', biology:'🌿', coding:'💻' };
+
+  grid.innerHTML = _courses.map(c => {
+    const color = subjectColors[c.subject] || '#4f46e5';
+    const emoji = subjectEmoji[c.subject]  || '📖';
+    const levelCount = c.levels ? c.levels.length : 0;
+    const approved = c.approved
+      ? `<span class="badge badge-success">Published</span>`
+      : `<span class="badge badge-warning">Pending</span>`;
+    return `<div class="card" style="border-top:4px solid ${color};">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+        <span style="font-size:2rem;">${emoji}</span>
+        ${approved}
+      </div>
+      <h3 style="font-size:1rem;font-weight:800;margin-bottom:.4rem;">${c.title}</h3>
+      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:.75rem;">${c.description||''}</p>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem;">
+        <span class="badge badge-primary">Class ${c.class}</span>
+        <span class="badge" style="background:#f0f4ff;color:var(--text-muted);">${levelCount} Levels</span>
+        <span class="badge" style="background:#f0f4ff;color:var(--text-muted);">${c.language?.toUpperCase()||'EN'}</span>
+      </div>
+      <div style="display:flex;gap:.5rem;">
+        <a href="upload.html?edit=${c.id}" class="btn btn-sm btn-outline" style="flex:1;justify-content:center;">✏️ Edit</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render Charts ─────────────────────────────────────────────
+function renderCharts() {
+  // Score Distribution
+  new Chart(document.getElementById('scoreDistChart'), {
+    type: 'bar',
+    data: {
+      labels: ['0-40%','41-60%','61-70%','71-85%','86-100%'],
+      datasets: [{
+        label: 'Students',
+        data: [3, 7, 12, 18, 10],
+        backgroundColor: ['#fca5a5','#fcd34d','#fde68a','#86efac','#34d399'],
+        borderRadius: 8,
+      }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f0f4ff' } }, x: { grid: { display: false } } } }
+  });
+
+  // Weekly Activity
+  new Chart(document.getElementById('weeklyActivityChart'), {
+    type: 'line',
+    data: {
+      labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets: [{
+        label: 'Active Students',
+        data: [18, 22, 15, 28, 24, 10, 8],
+        borderColor: '#4f46e5',
+        backgroundColor: 'rgba(79,70,229,.1)',
+        fill: true,
+        tension: .4,
+        pointBackgroundColor: '#4f46e5',
+        pointRadius: 5,
+      }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f0f4ff' } }, x: { grid: { display: false } } } }
+  });
+
+  // Completion by Subject (Analytics)
+  new Chart(document.getElementById('completionBySubjectChart'), {
+    type: 'radar',
+    data: {
+      labels: ['Math','Physics','Chemistry','Biology','Coding'],
+      datasets: [{
+        label: 'Avg Completion %',
+        data: [72, 58, 65, 80, 45],
+        backgroundColor: 'rgba(79,70,229,.15)',
+        borderColor: '#4f46e5',
+        pointBackgroundColor: '#4f46e5',
+      }]
+    },
+    options: { scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20 } } } }
+  });
+
+  // Most Failed Topics
+  new Chart(document.getElementById('failedTopicsChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Quadratic Eq','Electrostatics','Organic Chem','Genetics','Recursion'],
+      datasets: [{
+        label: 'Fail Rate %',
+        data: [62, 55, 70, 48, 58],
+        backgroundColor: '#fca5a5',
+        borderRadius: 8,
+      }]
+    },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, max: 100, grid: { color: '#f0f4ff' } } } }
+  });
+
+  // 30-day Activity
+  const days = Array.from({length:30}, (_,i) => i+1);
+  const acts = days.map(() => Math.floor(Math.random()*20+5));
+  new Chart(document.getElementById('activityChart'), {
+    type: 'bar',
+    data: {
+      labels: days,
+      datasets: [{ label: 'Active Students', data: acts, backgroundColor: '#818cf8', borderRadius: 4 }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f0f4ff' } }, x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } } } }
+  });
+
+  // Score Ranges Pie
+  new Chart(document.getElementById('scoreRangeChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Excellent (>85%)','Good (71-85%)','Pass (50-70%)','Fail (<50%)'],
+      datasets: [{
+        data: [20, 35, 28, 17],
+        backgroundColor: ['#34d399','#60a5fa','#fcd34d','#fca5a5'],
+        borderWidth: 0,
+      }]
+    },
+    options: { cutout: '65%', plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
+// ── Weak Topics ───────────────────────────────────────────────
+function renderWeakTopics() {
+  const topics = [
+    { name:'Quadratic Equations', level:'high' },
+    { name:'Organic Chemistry', level:'high' },
+    { name:'Electrostatics', level:'medium' },
+    { name:'Recursion in Coding', level:'high' },
+    { name:'Genetics', level:'medium' },
+    { name:'Integration', level:'medium' },
+  ];
+  document.getElementById('weak-topics-list').innerHTML = `
+    <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:.75rem;">Topics where >50% students are struggling:</p>
+    ${topics.map(t => `<span class="topic-chip ${t.level==='medium'?'medium':''}">${t.name}</span>`).join('')}
+    <div style="margin-top:1.25rem;padding:.85rem;background:#fef9f0;border-radius:10px;font-size:.85rem;color:#92400e;">
+      💡 <strong>Tip:</strong> Consider uploading additional practice quizzes for these topics.
+    </div>
+  `;
+}
+
+// ── Utilities ─────────────────────────────────────────────────
+function timeAgo(date) {
+  const diff = Date.now() - date.getTime();
+  const mins = Math.floor(diff/60000);
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins/60);
+  if (hrs < 24) return hrs + 'h ago';
+  return Math.floor(hrs/24) + 'd ago';
+}
+</script>
+</body>
+</html>
