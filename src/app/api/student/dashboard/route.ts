@@ -39,9 +39,6 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
-            contents: {
-              orderBy: { createdAt: 'asc' }
-            }
           },
         },
       },

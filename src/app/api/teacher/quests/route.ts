@@ -19,8 +19,7 @@ export async function GET(req: NextRequest) {
         where: { grade },
         orderBy: { order: 'asc' },
         include: { 
-          quests: { orderBy: { order: 'asc' } },
-          contents: { orderBy: { createdAt: 'asc' } }
+          quests: { orderBy: { order: 'asc' } }
         },
       },
     },
@@ -29,7 +28,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ subjects })
 }
 
-// POST /api/teacher/quests — create a new quest (optionally with new unit)
+// POST /api/teacher/quests — create or update a quest
 export async function POST(req: NextRequest) {
   try {
     const session = await auth()
@@ -39,13 +38,33 @@ export async function POST(req: NextRequest) {
 
     const teacherId = (session.user as any).id
     const body = await req.json()
-    const { subjectSlug, unitName, unitId, grade, title, type, difficulty, xpReward, timeLimit, questions } = body
+    const { subjectSlug, unitName, unitId, grade, title, type, difficulty, xpReward, passMark, timeLimit, questions, questId } = body
 
     if (!title || !subjectSlug || !grade) {
       return NextResponse.json({ error: 'title, subjectSlug and grade are required' }, { status: 400 })
     }
 
-    // Resolve or create unit
+    // If updating existing quest
+    if (questId) {
+      const quest = await prisma.quest.findUnique({ where: { id: questId } })
+      if (!quest) return NextResponse.json({ error: 'Quest not found' }, { status: 404 })
+
+      const updated = await prisma.quest.update({
+        where: { id: questId },
+        data: {
+          title,
+          type: type || 'QUIZ',
+          difficulty: difficulty || 'EASY',
+          xpReward: parseInt(xpReward) || 50,
+          passMark: parseInt(passMark) || 70,
+          timeLimit: parseInt(timeLimit) || 300,
+          content: JSON.stringify({ questions: questions || [] }),
+        },
+      })
+      return NextResponse.json({ success: true, quest: updated })
+    }
+
+    // Creating new quest
     let resolvedUnitId = unitId
     if (!resolvedUnitId && unitName) {
       const subject = await prisma.subject.findUnique({ where: { slug: subjectSlug } })
@@ -80,6 +99,7 @@ export async function POST(req: NextRequest) {
         type: type || 'QUIZ',
         difficulty: difficulty || 'EASY',
         xpReward: parseInt(xpReward) || 50,
+        passMark: parseInt(passMark) || 70,
         timeLimit: parseInt(timeLimit) || 300,
         order: (lastQuest?.order ?? 0) + 1,
         unitId: resolvedUnitId,
