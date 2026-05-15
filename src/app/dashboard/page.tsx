@@ -316,7 +316,7 @@ export default function DashboardPage() {
                     {unit.quests.map((quest: any, qIdx: number) => {
                       const completed = !!quest.progress
                       const stars = quest.progress?.stars ?? 0
-                      const isLocked = qIdx > 0 && !unit.quests[qIdx - 1].progress
+                      const isLocked = false // All quests are accessible
                       return (
                         <motion.div
                           key={quest.id}
