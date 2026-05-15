@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VidyaSpark — Demo Data Seeder</title>
+  <link rel="stylesheet" href="C:\Users\envir\Desktop\vidyaspark\css\style.css">
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <style>
+    body { max-width: 700px; margin: 2rem auto; padding: 1rem; font-family: 'Nunito', sans-serif; }
+    .log { background: #1e1b4b; color: #a5b4fc; padding: 1rem; border-radius: 12px; font-size: .85rem; line-height: 1.8; max-height: 400px; overflow-y: auto; margin-top: 1rem; font-family: monospace; }
+    .log .success { color: #6ee7b7; }
+    .log .error   { color: #fca5a5; }
+    .log .info    { color: #93c5fd; }
+    .step-btn { margin: .5rem; }
+  </style>
+</head>
+<body>
+  <h1>🌱 VidyaSpark Demo Data Seeder</h1>
+  <p style="color:#6b7280;margin-bottom:1.5rem;">Run this once to populate your Firebase with demo accounts and sample content.</p>
+
+  <div class="card" style="margin-bottom:1rem;">
+    <h3>Step 1 — Create Demo Accounts</h3>
+    <p style="color:#6b7280;font-size:.9rem;margin:.5rem 0 1rem;">Creates student@demo.com, teacher@demo.com, admin@demo.com (password: demo123)</p>
+    <button class="btn btn-primary step-btn" onclick="seedAccounts()">Create Demo Accounts</button>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem;">
+    <h3>Step 2 — Seed Sample Courses</h3>
+    <p style="color:#6b7280;font-size:.9rem;margin:.5rem 0 1rem;">Adds Math, Science, and Coding courses with lessons and quizzes</p>
+    <button class="btn btn-success step-btn" onclick="seedCourses()">Seed Courses</button>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem;">
+    <h3>Step 3 — Seed Schools & Leaderboard</h3>
+    <p style="color:#6b7280;font-size:.9rem;margin:.5rem 0 1rem;">Adds sample schools and leaderboard entries</p>
+    <button class="btn btn-accent step-btn" onclick="seedSchoolsAndLeaderboard()">Seed Schools</button>
+  </div>
+
+  <div class="card">
+    <h3>Step 4 — Seed Daily Challenges</h3>
+    <button class="btn btn-outline step-btn" onclick="seedChallenges()">Seed Challenges</button>
+  </div>
+
+  <div class="log" id="log"><span class="info">Ready to seed. Click a button above to begin...</span></div>
+
+  <script src="../firebase/firebase-config.js"></script>
+  <script>
+    const log = document.getElementById('log');
+    function print(msg, type='info') {
+      log.innerHTML += `<br><span class="${type}">${new Date().toLocaleTimeString()} — ${msg}</span>`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    // ── Demo Accounts ─────────────────────────────────────────
+    async function seedAccounts() {
+      print('Creating demo accounts...', 'info');
+      const ACCOUNTS = [
+        { email:'student@demo.com', password:'demo123', name:'Aryan Student', role:'student', class:'9', schoolId:'school1' },
+        { email:'teacher@demo.com', password:'demo123', name:'Priya Teacher',  role:'teacher', schoolId:'school1', approved:true },
+        { email:'admin@demo.com',   password:'demo123', name:'Raj Admin',      role:'admin',   schoolId:'school1', approved:true },
+      ];
+
+      for (const acc of ACCOUNTS) {
+        try {
+          let cred;
+          try {
+            cred = await auth.createUserWithEmailAndPassword(acc.email, acc.password);
+            print(`✅ Created account: ${acc.email}`, 'success');
+          } catch(e) {
+            if (e.code === 'auth/email-already-in-use') {
+              print(`ℹ️ Account already exists: ${acc.email}`, 'info');
+              // Sign in to get UID
+              cred = await auth.signInWithEmailAndPassword(acc.email, acc.password);
+            } else throw e;
+          }
+
+          await cred.user.updateProfile({ displayName: acc.name });
+
+          const profile = {
+            name: acc.name, email: acc.email, role: acc.role,
+            schoolId: acc.schoolId, schoolName: 'Govt. High School, Raipur',
+            xp: acc.role === 'student' ? 750 : 0,
+            streak: acc.role === 'student' ? 7 : 0,
+            lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+            lastStreakDate: new Date().toDateString(),
+            language: 'en',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            approved: acc.approved !== false,
+            badges: acc.role === 'student' ? ['streak_7','xp_500'] : [],
+            achievements: [],
+          };
+          if (acc.role === 'student') profile.class = acc.class;
+
+          await db.collection('users').doc(cred.user.uid).set(profile, { merge: true });
+
+          if (acc.role === 'student') {
+            await db.collection('leaderboard').doc(cred.user.uid).set({
+              userId: cred.user.uid, name: acc.name, xp: 750,
+              schoolId: acc.schoolId, class: '9', week: '2024-W22', rank: 1,
+            });
+            // Seed some rewards
+            await db.collection('rewards').add({
+              userId: cred.user.uid, badgeId: 'streak_7', type:'badge',
+              icon:'🔥', name:'7-Day Learner',
+              earnedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+
+          print(`✅ Profile saved for ${acc.name}`, 'success');
+          await auth.signOut();
+        } catch(e) {
+          print(`❌ Error for ${acc.email}: ${e.message}`, 'error');
+        }
+      }
+      print('✅ Demo accounts seeded!', 'success');
+    }
+
+    // ── Sample Courses ─────────────────────────────────────────
+    async function seedCourses() {
+      print('Seeding sample courses...', 'info');
+
+      const courses = [
+        {
+          title: 'Algebra Basics',
+          subject: 'math', class: '9', language: 'en', teacherId: 'demo_teacher',
+          description: 'Learn algebra from scratch — variables, equations, and more!',
+          approved: true,
+          levels: [
+            { id:'l1', title:'What is Algebra?',       type:'lesson', order:1 },
+            { id:'q1', title:'Quiz 1',                 type:'quiz',   order:2 },
+            { id:'l2', title:'Variables & Expressions', type:'lesson', order:3 },
+            { id:'q2', title:'Quiz 2',                 type:'quiz',   order:4 },
+            { id:'l3', title:'Solving Equations',      type:'lesson', order:5 },
+            { id:'q3', title:'Final Quiz',             type:'quiz',   order:6 },
+          ],
+        },
+        {
+          title: 'Forces & Motion',
+          subject: 'physics', class: '9', language: 'en', teacherId: 'demo_teacher',
+          description: 'Understand Newton\'s laws and how things move.',
+          approved: true,
+          levels: [
+            { id:'l1', title:'What is Force?',         type:'lesson', order:1 },
+            { id:'q1', title:'Quiz 1',                 type:'quiz',   order:2 },
+            { id:'l2', title:'Newton\'s 3 Laws',       type:'lesson', order:3 },
+            { id:'q2', title:'Final Quiz',             type:'quiz',   order:4 },
+          ],
+        },
+        {
+          title: 'Introduction to Python',
+          subject: 'coding', class: '9', language: 'en', teacherId: 'demo_teacher',
+          description: 'Your first steps into programming with Python.',
+          approved: true,
+          levels: [
+            { id:'l1', title:'Hello World',            type:'lesson', order:1 },
+            { id:'q1', title:'Quiz 1',                 type:'quiz',   order:2 },
+            { id:'l2', title:'Variables & Data Types', type:'lesson', order:3 },
+            { id:'q2', title:'Quiz 2',                 type:'quiz',   order:4 },
+            { id:'l3', title:'If-Else Conditions',     type:'lesson', order:5 },
+            { id:'q3', title:'Final Quiz',             type:'quiz',   order:6 },
+          ],
+        },
+      ];
+
+      for (const course of courses) {
+        try {
+          const docRef = await db.collection('courses').add({
+            ...course,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+          print(`✅ Created course: ${course.title} (${docRef.id})`, 'success');
+
+          // Add sample quizzes
+          await db.collection('quizzes').add({
+            courseId: docRef.id,
+            title: course.title + ' — Quick Quiz',
+            subject: course.subject, class: course.class,
+            passMark: 70, xpReward: 50, timeLimit: 120,
+            questions: [
+              { question: `Which is a key concept in ${course.title}?`, options:['Option A','Option B','Option C','Option D'], answer:0, difficulty:'easy' },
+              { question: 'What does 2x = 10 solve to?', options:['x=3','x=4','x=5','x=6'], answer:2, difficulty:'medium' },
+              { question: 'True or False: Practice makes perfect.', options:['True','False','Maybe','None'], answer:0, difficulty:'easy' },
+            ],
+          });
+        } catch(e) {
+          print(`❌ Error seeding course ${course.title}: ${e.message}`, 'error');
+        }
+      }
+      print('✅ Courses seeded!', 'success');
+    }
+
+    // ── Schools & Leaderboard ─────────────────────────────────
+    async function seedSchoolsAndLeaderboard() {
+      print('Seeding schools...', 'info');
+      const schools = [
+        { id:'school1', name:'Govt. High School, Raipur', district:'Raipur', state:'Chhattisgarh', totalStudents:450 },
+        { id:'school2', name:'Kendriya Vidyalaya, Delhi',  district:'Delhi',  state:'Delhi',        totalStudents:1200 },
+        { id:'school3', name:'Navodaya Vidyalaya, Patna', district:'Patna',  state:'Bihar',         totalStudents:320 },
+      ];
+      for (const s of schools) {
+        try {
+          await db.collection('schools').doc(s.id).set({
+            ...s, adminId:'demo_admin', createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+          print(`✅ School: ${s.name}`, 'success');
+        } catch(e) { print(`❌ ${e.message}`, 'error'); }
+      }
+
+      // Sample leaderboard entries
+      print('Seeding leaderboard...', 'info');
+      const entries = [
+        { name:'Aryan Kumar', xp:1200, class:'9', schoolId:'school1' },
+        { name:'Priya Sharma', xp:980,  class:'9', schoolId:'school1' },
+        { name:'Rohit Verma',  xp:860,  class:'9', schoolId:'school2' },
+        { name:'Anita Singh',  xp:720,  class:'9', schoolId:'school1' },
+        { name:'Dev Patel',    xp:650,  class:'9', schoolId:'school3' },
+      ];
+      for (let i = 0; i < entries.length; i++) {
+        try {
+          await db.collection('leaderboard').add({
+            ...entries[i], userId: 'demo_user_' + i,
+            week:'2024-W22', rank: i+1,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+        } catch(e) { print(`❌ Leaderboard error: ${e.message}`, 'error'); }
+      }
+      print('✅ Schools and leaderboard seeded!', 'success');
+    }
+
+    // ── Daily Challenges ──────────────────────────────────────
+    async function seedChallenges() {
+      print('Seeding daily challenges...', 'info');
+      const today = new Date().toISOString().split('T')[0];
+      const challenges = [
+        {
+          title: 'Algebra Sprint',
+          description: 'Solve 5 algebra questions to earn bonus XP!',
+          subject: 'math', xpReward: 100, type: 'quiz',
+          date: today, active: true,
+        },
+        {
+          title: 'Science Explorer',
+          description: 'Complete one lesson in Physics or Chemistry.',
+          subject: 'physics', xpReward: 75, type: 'lesson',
+          date: today, active: true,
+        },
+        {
+          title: 'Code Challenge',
+          description: 'Write a simple Python program with 3 variables.',
+          subject: 'coding', xpReward: 150, type: 'activity',
+          date: today, active: true,
+        },
+      ];
+      for (const c of challenges) {
+        try {
+          await db.collection('challenges').add({ ...c, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+          print(`✅ Challenge: ${c.title}`, 'success');
+        } catch(e) { print(`❌ ${e.message}`, 'error'); }
+      }
+      print('✅ Challenges seeded!', 'success');
+      print('🎉 ALL DONE! Your demo data is ready. Go back to /index.html to test.', 'success');
+    }
+  </script>
+</body>
+</html>

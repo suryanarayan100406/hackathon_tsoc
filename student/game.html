@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VidyaSpark — Learning Map</title>
+  <link rel="stylesheet" href="C:\Users\envir\Desktop\vidyaspark\css\style.css">
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+</head>
+<body>
+<button class="mobile-menu-btn" id="mob-menu-btn">&#9776;</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">VS</div>
+    <div><div class="logo-text">VidyaSpark</div><div class="logo-sub">Student Portal</div></div>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="/student/dashboard.html" class="nav-item"><span class="nav-icon">&#127968;</span> Dashboard</a>
+    <a href="/student/game.html" class="nav-item active"><span class="nav-icon">&#127891;</span> Subjects</a>
+    <a href="/student/quiz.html" class="nav-item"><span class="nav-icon">&#128196;</span> Quizzes</a>
+    <a href="#" class="nav-item" id="logout-btn"><span class="nav-icon">&#128682;</span> Logout</a>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-mini">
+      <div class="user-avatar" id="user-avatar-mini">P</div>
+      <div><div class="user-name" id="user-name-mini">Loading...</div><div class="user-role">Student</div></div>
+    </div>
+  </div>
+</aside>
+
+<main class="main-content">
+  <!-- Subject Selector Header -->
+  <div class="page-header">
+    <div>
+      <h1 id="subject-title">Choose a Subject</h1>
+      <p class="page-subtitle" id="subject-sub">Select a subject to explore the learning map</p>
+    </div>
+    <a href="/student/dashboard.html" class="btn btn-outline btn-sm">← Back</a>
+  </div>
+
+  <!-- Subject Tabs (when no subject selected) -->
+  <div id="subject-selector">
+    <div class="grid-auto">
+      <a href="?subject=math"      class="subject-card subj-math">    <div class="subj-icon">&#129518;</div><div class="subj-title">Mathematics</div></a>
+      <a href="?subject=physics"   class="subject-card subj-physics"> <div class="subj-icon">&#9889;</div><div class="subj-title">Physics</div></a>
+      <a href="?subject=chemistry" class="subject-card subj-chem">    <div class="subj-icon">&#128137;</div><div class="subj-title">Chemistry</div></a>
+      <a href="?subject=biology"   class="subject-card subj-bio">     <div class="subj-icon">&#127807;</div><div class="subj-title">Biology</div></a>
+      <a href="?subject=coding"    class="subject-card subj-coding">  <div class="subj-icon">&#128187;</div><div class="subj-title">Coding</div></a>
+    </div>
+  </div>
+
+  <!-- Game Map (shown when subject is selected) -->
+  <div id="game-map-section" class="hidden">
+    <!-- Subject sub-tabs -->
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:2rem;">
+      <a href="?subject=math"      class="btn btn-sm" id="tab-math">&#129518; Math</a>
+      <a href="?subject=physics"   class="btn btn-sm" id="tab-physics">&#9889; Physics</a>
+      <a href="?subject=chemistry" class="btn btn-sm" id="tab-chem">&#128137; Chemistry</a>
+      <a href="?subject=biology"   class="btn btn-sm" id="tab-bio">&#127807; Biology</a>
+      <a href="?subject=coding"    class="btn btn-sm" id="tab-coding">&#128187; Coding</a>
+    </div>
+
+    <div class="grid-2" style="gap:2rem;">
+      <!-- Game Map -->
+      <div>
+        <div class="card" style="padding:2rem;">
+          <h3 style="text-align:center;margin-bottom:1.5rem;" id="map-title">Level Map</h3>
+          <div class="game-map" id="game-map">
+            <!-- Levels rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Level Info Panel -->
+      <div id="level-info-panel">
+        <div class="card" id="level-detail" style="display:none;">
+          <div id="level-detail-content"></div>
+        </div>
+        <div class="card" id="level-placeholder" style="text-align:center;padding:3rem;color:var(--text-muted);">
+          <div style="font-size:3rem;margin-bottom:1rem;">&#128507;</div>
+          <h3>Select a Level</h3>
+          <p>Click any level on the map to see details and start learning!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Level Locked Modal -->
+<div id="locked-modal" style="display:none;" class="badge-popup-overlay" onclick="this.style.display='none'">
+  <div class="badge-popup-card" onclick="event.stopPropagation()">
+    <div style="font-size:3.5rem;margin-bottom:1rem;">&#128274;</div>
+    <h2 style="margin-bottom:.5rem;">Level Locked!</h2>
+    <p style="color:var(--text-muted);margin-bottom:1.5rem;" id="locked-msg">Complete the previous level and pass the quiz (70%+) to unlock this level.</p>
+    <button class="btn btn-primary" onclick="document.getElementById('locked-modal').style.display='none'">Got it!</button>
+  </div>
+</div>
+
+<script src="/firebase/firebase-config.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/game.js"></script>
+<script>
+document.getElementById('mob-menu-btn').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('show');
+});
+document.getElementById('sidebar-overlay').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+});
+document.getElementById('logout-btn').addEventListener('click', e => { e.preventDefault(); Auth.signOut(); });
+
+Auth.requireAuth(['student']).then(({ user, profile }) => {
+  document.getElementById('user-avatar-mini').textContent = profile.name.charAt(0);
+  document.getElementById('user-name-mini').textContent = profile.name;
+
+  const params = new URLSearchParams(window.location.search);
+  const subject = params.get('subject');
+
+  if (!subject) {
+    document.getElementById('subject-selector').classList.remove('hidden');
+    document.getElementById('game-map-section').classList.add('hidden');
+  } else {
+    document.getElementById('subject-selector').classList.add('hidden');
+    document.getElementById('game-map-section').classList.remove('hidden');
+    GameMap.init(subject, user.uid, profile.class);
+
+    // Highlight active tab
+    const tabMap = { math:'tab-math', physics:'tab-physics', chemistry:'tab-chem', biology:'tab-bio', coding:'tab-coding' };
+    const activeTab = document.getElementById(tabMap[subject]);
+    if (activeTab) activeTab.className = 'btn btn-sm btn-primary';
+    else document.querySelectorAll('[id^="tab-"]').forEach(t => t.className = 'btn btn-sm btn-outline');
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VidyaSpark — Student Dashboard</title>
+  <link rel="stylesheet" href="C:\Users\envir\Desktop\vidyaspark\css\style.css">
+  <link rel="manifest" href="/manifest.json">
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Mobile menu button -->
+<button class="mobile-menu-btn" id="mob-menu-btn" aria-label="Open menu">&#9776;</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<!-- ── SIDEBAR ─────────────────────────────────────────────── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">VS</div>
+    <div>
+      <div class="logo-text" data-i18n="app_name">VidyaSpark</div>
+      <div class="logo-sub">Student Portal</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">MAIN</div>
+    <a href="/student/dashboard.html" class="nav-item active">
+      <span class="nav-icon">&#127968;</span>
+      <span data-i18n="dashboard">Dashboard</span>
+    </a>
+    <a href="/student/game.html" class="nav-item">
+      <span class="nav-icon">&#127891;</span>
+      <span data-i18n="subjects">Subjects</span>
+    </a>
+    <a href="/student/quiz.html" class="nav-item">
+      <span class="nav-icon">&#128196;</span>
+      <span data-i18n="quiz">Quizzes</span>
+    </a>
+
+    <div class="nav-section-label">REWARDS</div>
+    <a href="#leaderboard" class="nav-item" id="lb-link">
+      <span class="nav-icon">&#127942;</span>
+      <span data-i18n="leaderboard">Leaderboard</span>
+    </a>
+    <a href="#badges" class="nav-item" id="badges-link">
+      <span class="nav-icon">&#127806;</span>
+      Badges
+    </a>
+
+    <div class="nav-section-label">SETTINGS</div>
+    <a href="#" class="nav-item" id="lang-nav">
+      <span class="nav-icon">&#127760;</span>
+      <span data-i18n="language">Language</span>
+    </a>
+    <a href="#" class="nav-item" id="logout-btn">
+      <span class="nav-icon">&#128682;</span>
+      <span data-i18n="logout">Logout</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-bottom">
+    <div class="user-mini">
+      <div class="user-avatar" id="user-avatar-mini">P</div>
+      <div>
+        <div class="user-name" id="user-name-mini">Loading...</div>
+        <div class="user-role">Student</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ── MAIN CONTENT ────────────────────────────────────────── -->
+<main class="main-content">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1 id="greeting-text">Good Morning! &#127774;</h1>
+      <p class="page-subtitle" id="class-label">Class 9 · <span id="school-name">Loading school...</span></p>
+    </div>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <!-- Language Toggle -->
+      <div class="lang-toggle lang-switcher" style="font-size:.85rem;">
+        <span>&#127760;</span>
+        <span class="lang-btn active" data-lang="en">EN</span>
+        <span class="lang-btn" data-lang="hi">&#2361;&#2367;</span>
+      </div>
+      <!-- Offline status -->
+      <div id="offline-pill" class="pill pill-warning hidden">&#128997; Offline</div>
+    </div>
+  </div>
+
+  <!-- ── STATS ROW ── -->
+  <div class="grid-4 mb-3" id="stats-row">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#eef2ff;color:var(--primary);">&#9889;</div>
+      <div>
+        <div class="stat-value" id="stat-xp">0</div>
+        <div class="stat-label" data-i18n="xp_points">XP Points</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#fff7ed;color:#ea580c;">&#128293;</div>
+      <div>
+        <div class="stat-value" id="stat-streak">0</div>
+        <div class="stat-label" data-i18n="streak">Day Streak</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#f0fdf4;color:var(--success);">&#127942;</div>
+      <div>
+        <div class="stat-value" id="stat-badges">0</div>
+        <div class="stat-label" data-i18n="achievements">Achievements</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#fdf4ff;color:var(--purple);">&#127769;</div>
+      <div>
+        <div class="stat-value" id="stat-rank">#-</div>
+        <div class="stat-label" data-i18n="rank">Rank</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── XP PROGRESS ── -->
+  <div class="card mb-3">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <div>
+        <h3>Level Progress</h3>
+        <p class="text-muted" style="font-size:.85rem;margin-top:.25rem" id="xp-progress-label">0 / 1000 XP to next level</p>
+      </div>
+      <div class="streak-badge" id="streak-display">&#128293; 0 days</div>
+    </div>
+    <div class="xp-bar-wrap">
+      <div class="xp-bar" id="xp-bar" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- ── DAILY CHALLENGE ── -->
+  <div class="card mb-3" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border-radius:var(--radius-xl);">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+      <div>
+        <div style="font-size:.8rem;font-weight:700;opacity:.8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.5rem" data-i18n="today_mission">Today's Mission</div>
+        <h2 style="font-size:1.2rem;margin-bottom:.5rem" id="challenge-title">Solve 5 Algebra Questions</h2>
+        <p style="opacity:.85;font-size:.9rem" id="challenge-desc">Complete today's challenge to earn bonus XP!</p>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:2rem;font-weight:900;font-family:var(--font-display);" id="challenge-reward">+100 XP</div>
+        <a href="/student/quiz.html" class="btn btn-accent btn-sm" style="margin-top:.5rem;" data-i18n="start">Start Now!</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TWO COLUMN: Subjects + Leaderboard ── -->
+  <div class="grid-2" style="gap:1.5rem;">
+
+    <!-- Subjects -->
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h2>&#127891; <span data-i18n="subjects">Subjects</span></h2>
+        <a href="/student/game.html" class="btn btn-outline btn-sm">View All</a>
+      </div>
+      <div class="grid-2" id="subjects-grid">
+        <a href="/student/game.html?subject=math" class="subject-card subj-math">
+          <div class="subj-icon">&#129518;</div>
+          <div class="subj-title" data-i18n="math">Mathematics</div>
+          <div class="subj-progress" id="prog-math">0% complete</div>
+        </a>
+        <a href="/student/game.html?subject=physics" class="subject-card subj-physics">
+          <div class="subj-icon">&#9889;</div>
+          <div class="subj-title" data-i18n="physics">Physics</div>
+          <div class="subj-progress" id="prog-physics">0% complete</div>
+        </a>
+        <a href="/student/game.html?subject=chemistry" class="subject-card subj-chem">
+          <div class="subj-icon">&#128137;</div>
+          <div class="subj-title" data-i18n="chemistry">Chemistry</div>
+          <div class="subj-progress" id="prog-chemistry">0% complete</div>
+        </a>
+        <a href="/student/game.html?subject=biology" class="subject-card subj-bio">
+          <div class="subj-icon">&#127807;</div>
+          <div class="subj-title" data-i18n="biology">Biology</div>
+          <div class="subj-progress" id="prog-biology">0% complete</div>
+        </a>
+      </div>
+      <a href="/student/game.html?subject=coding" class="subject-card subj-coding" style="margin-top:1rem;display:flex;flex-direction:row;align-items:center;gap:1rem;padding:1.25rem 1.5rem;">
+        <div class="subj-icon" style="font-size:1.8rem;">&#128187;</div>
+        <div>
+          <div class="subj-title" data-i18n="coding">Coding</div>
+          <div class="subj-progress" id="prog-coding">0% complete</div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Leaderboard -->
+    <div id="leaderboard">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h2>&#127942; <span data-i18n="leaderboard">Leaderboard</span></h2>
+        <div style="display:flex;gap:.5rem;">
+          <button class="btn btn-sm btn-primary" id="lb-school-btn" onclick="switchLeaderboard('school')">School</button>
+          <button class="btn btn-sm btn-outline" id="lb-weekly-btn" onclick="switchLeaderboard('weekly')">Weekly</button>
+        </div>
+      </div>
+      <div class="card card-flat" id="leaderboard-list">
+        <p class="text-muted text-center" style="padding:2rem;">Loading leaderboard...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BADGES ── -->
+  <div id="badges" style="margin-top:2rem;">
+    <h2 style="margin-bottom:1rem;">&#127806; My Badges</h2>
+    <div class="card">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:1rem;" id="badges-grid">
+        <div class="badge-item">
+          <div class="badge-icon">&#128274;</div>
+          <div class="badge-name">Locked</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PROGRESS CHART ── -->
+  <div style="margin-top:2rem;">
+    <h2 style="margin-bottom:1rem;">&#128200; Weekly Progress</h2>
+    <div class="card">
+      <canvas id="progress-chart" height="120"></canvas>
+    </div>
+  </div>
+
+</main>
+
+<!-- Offline Banner -->
+<div class="offline-banner" id="offline-banner">
+  &#128997; You're offline — your progress will sync when you reconnect.
+</div>
+
+<!-- Scripts -->
+<script src="/firebase/firebase-config.js"></script>
+<script src="/js/i18n.js"></script>
+<script src="/js/auth.js"></script>
+<script src="/js/offline.js"></script>
+<script src="/js/progress.js"></script>
+<script>
+// ── ALL BADGE DEFINITIONS ──────────────────────────────────
+const ALL_BADGES = [
+  { id:'streak_7',   icon:'&#128293;', name:'7-Day Learner',    desc:'Login 7 days in a row' },
+  { id:'streak_30',  icon:'&#9889;',  name:'30-Day Champion',   desc:'Login 30 days in a row' },
+  { id:'xp_500',     icon:'&#127775;', name:'Rising Star',       desc:'Earn 500 XP' },
+  { id:'xp_1000',    icon:'&#127942;', name:'Knowledge Hero',    desc:'Earn 1000 XP' },
+  { id:'quiz_champ', icon:'&#127775;', name:'Quiz Champion',     desc:'Score 100% on a quiz' },
+  { id:'math_war',   icon:'&#129518;', name:'Math Warrior',      desc:'Complete Math roadmap' },
+  { id:'sci_master', icon:'&#128137;', name:'Science Master',    desc:'Complete 3 science subjects' },
+  { id:'first_quiz', icon:'&#128196;', name:'First Quiz',        desc:'Complete your first quiz' },
+];
+
+// ── MOBILE MENU ────────────────────────────────────────────
+document.getElementById('mob-menu-btn').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('show');
+});
+document.getElementById('sidebar-overlay').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+});
+
+// ── LOGOUT ─────────────────────────────────────────────────
+document.getElementById('logout-btn').addEventListener('click', e => { e.preventDefault(); Auth.signOut(); });
+
+// ── LEADERBOARD TABS ───────────────────────────────────────
+let currentLBMode = 'school';
+function switchLeaderboard(mode) {
+  currentLBMode = mode;
+  document.getElementById('lb-school-btn').className = mode === 'school' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+  document.getElementById('lb-weekly-btn').className = mode === 'weekly' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+  loadLeaderboard(mode);
+}
+
+// ── MAIN INIT ──────────────────────────────────────────────
+Auth.requireAuth(['student']).then(({ user, profile }) => {
+  const uid = user.uid;
+
+  // Greeting
+  document.getElementById('greeting-text').textContent = I18n.getGreeting() + ', ' + profile.name.split(' ')[0] + '! ';
+  document.getElementById('class-label').innerHTML = `Class ${profile.class} &middot; <span id="school-name">${profile.schoolId || 'VidyaSpark School'}</span>`;
+
+  // Sidebar mini user
+  document.getElementById('user-avatar-mini').textContent = profile.name.charAt(0).toUpperCase();
+  document.getElementById('user-name-mini').textContent = profile.name;
+
+  // Stats
+  updateStats(profile);
+
+  // Load progress per subject
+  loadSubjectProgress(uid, profile.class);
+
+  // Load badges
+  loadBadges(uid);
+
+  // Load leaderboard
+  loadLeaderboard('school', profile.schoolId, uid);
+
+  // Weekly progress chart
+  drawProgressChart(uid);
+
+  // Daily challenge (rotates daily)
+  loadDailyChallenge();
+
+  // i18n
+  I18n.initLangToggle();
+}).catch(err => console.error(err));
+
+// ── UPDATE STATS ───────────────────────────────────────────
+function updateStats(profile) {
+  document.getElementById('stat-xp').textContent = (profile.xp || 0).toLocaleString();
+  document.getElementById('stat-streak').textContent = profile.streak || 0;
+
+  const xp = profile.xp || 0;
+  const lvl = Math.floor(xp / 1000);
+  const xpInLevel = xp % 1000;
+  const pct = (xpInLevel / 1000) * 100;
+  document.getElementById('xp-bar').style.width = pct + '%';
+  document.getElementById('xp-progress-label').textContent = `${xpInLevel} / 1000 XP to Level ${lvl + 1}`;
+  document.getElementById('streak-display').innerHTML = `&#128293; ${profile.streak || 0} days`;
+}
+
+// ── SUBJECT PROGRESS ───────────────────────────────────────
+async function loadSubjectProgress(uid, classGrade) {
+  const subjects = ['math','physics','chemistry','biology','coding'];
+  for (const subj of subjects) {
+    try {
+      const snap = await db.collection('progress')
+        .where('userId','==',uid)
+        .where('subject','==',subj)
+        .get();
+      const total = snap.size;
+      const done  = snap.docs.filter(d => d.data().completed).length;
+      const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+      const el = document.getElementById('prog-' + subj);
+      if (el) el.textContent = `${pct}% complete`;
+    } catch (e) {
+      // Offline / no data yet
+    }
+  }
+}
+
+// ── BADGES ────────────────────────────────────────────────
+async function loadBadges(uid) {
+  try {
+    const snap = await db.collection('rewards').where('userId','==',uid).get();
+    const earned = snap.docs.map(d => d.data().badgeId);
+    document.getElementById('stat-badges').textContent = earned.length;
+
+    const grid = document.getElementById('badges-grid');
+    grid.innerHTML = ALL_BADGES.map(b => `
+      <div class="badge-item ${earned.includes(b.id) ? 'earned' : ''}" title="${b.desc}">
+        <div class="badge-icon">${b.icon}</div>
+        <div class="badge-name">${b.name}</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    // Use cached badges
+    const cached = JSON.parse(localStorage.getItem('vs_badges') || '[]');
+    document.getElementById('stat-badges').textContent = cached.length;
+  }
+}
+
+// ── LEADERBOARD ────────────────────────────────────────────
+async function loadLeaderboard(mode, schoolId, currentUid) {
+  const list = document.getElementById('leaderboard-list');
+  list.innerHTML = '<p class="text-muted text-center" style="padding:1.5rem;">Loading...</p>';
+  try {
+    let query = db.collection('leaderboard').orderBy('xp','desc').limit(10);
+    const snap = await query.get();
+    const entries = snap.docs.map((d, i) => ({ rank: i+1, ...d.data(), id: d.id }));
+
+    // Update rank stat
+    const me = entries.find(e => e.id === (currentUid || auth.currentUser?.uid));
+    if (me) document.getElementById('stat-rank').textContent = '#' + me.rank;
+
+    list.innerHTML = entries.map(e => `
+      <div class="leaderboard-item ${e.id === auth.currentUser?.uid ? 'me' : ''}">
+        <div class="rank-badge ${e.rank <= 3 ? 'rank-' + e.rank : 'rank-other'}">${e.rank <= 3 ? ['&#129351;','&#129352;','&#129353;'][e.rank-1] : e.rank}</div>
+        <div class="user-avatar" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--purple));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.85rem;flex-shrink:0;">${(e.name||'?').charAt(0)}</div>
+        <div style="flex:1;">
+          <div style="font-weight:700">${e.name || 'Student'} ${e.id === auth.currentUser?.uid ? '<span class="pill pill-primary" style="font-size:.7rem;">You</span>' : ''}</div>
+          <div style="font-size:.8rem;color:var(--text-muted)">Class ${e.class || '-'}</div>
+        </div>
+        <div style="font-family:var(--font-display);font-weight:800;color:var(--primary)">${(e.xp||0).toLocaleString()} XP</div>
+      </div>
+    `).join('') || '<p class="text-muted text-center" style="padding:2rem;">No data yet. Be the first!</p>';
+  } catch (err) {
+    list.innerHTML = '<p class="text-muted text-center" style="padding:2rem;">Offline — leaderboard unavailable</p>';
+  }
+}
+
+// ── WEEKLY PROGRESS CHART ──────────────────────────────────
+function drawProgressChart(uid) {
+  const ctx = document.getElementById('progress-chart').getContext('2d');
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  // Simulate or load real per-day XP
+  const data = days.map(() => Math.floor(Math.random() * 200));
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: days,
+      datasets: [{
+        label: 'XP Earned',
+        data,
+        backgroundColor: 'rgba(79,70,229,.7)',
+        borderRadius: 8,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => c.raw + ' XP' } }
+      },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { color: '#6b7280' } },
+        x: { grid: { display: false }, ticks: { color: '#6b7280' } }
+      }
+    }
+  });
+}
+
+// ── DAILY CHALLENGE ────────────────────────────────────────
+function loadDailyChallenge() {
+  const challenges = [
+    { title:'Solve 5 Algebra Questions', desc:'Test your equation skills!', reward:'+100 XP', subject:'math' },
+    { title:'Complete Motion Laws Quiz', desc:'Newton is waiting for you!', reward:'+150 XP', subject:'physics' },
+    { title:'Name 10 Chemical Elements', desc:'How many can you recall?', reward:'+120 XP', subject:'chemistry' },
+    { title:'Cell Biology Flashcards', desc:'Learn about living cells!', reward:'+100 XP', subject:'biology' },
+    { title:'Write a Python Function', desc:'Code your way to the top!', reward:'+200 XP', subject:'coding' },
+  ];
+  const today = new Date().getDay();
+  const c = challenges[today % challenges.length];
+  document.getElementById('challenge-title').textContent = c.title;
+  document.getElementById('challenge-desc').textContent = c.desc;
+  document.getElementById('challenge-reward').textContent = c.reward;
+}
+
+// ── OFFLINE DETECTION ──────────────────────────────────────
+window.addEventListener('offline', () => {
+  document.getElementById('offline-banner').classList.add('show');
+  document.getElementById('offline-pill').classList.remove('hidden');
+});
+window.addEventListener('online', () => {
+  document.getElementById('offline-banner').classList.remove('show');
+  document.getElementById('offline-pill').classList.add('hidden');
+  // Sync pending progress
+  if (typeof OfflineSync !== 'undefined') OfflineSync.sync();
+});
+if (!navigator.onLine) {
+  document.getElementById('offline-banner').classList.add('show');
+  document.getElementById('offline-pill').classList.remove('hidden');
+}
+</script>
+</body>
+</html>

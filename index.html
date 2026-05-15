@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VidyaSpark — Learn. Play. Grow.</title>
+  <link rel="stylesheet" href="css\style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#4F46E5">
+  <meta name="description" content="VidyaSpark — Gamified STEM learning for rural school students.">
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+  <style>
+    .auth-wrapper { background: linear-gradient(135deg,#1e1b4b 0%,#4f46e5 45%,#7c3aed 75%,#0891b2 100%); }
+    .auth-bg-shapes { position:absolute;inset:0;overflow:hidden;pointer-events:none; }
+    .auth-shape { position:absolute;border-radius:50%;background:rgba(255,255,255,.06);animation:shape-drift 20s ease-in-out infinite alternate; }
+    @keyframes shape-drift { 0%{transform:translate(0,0) scale(1);}100%{transform:translate(30px,-20px) scale(1.05);} }
+    .auth-card { animation:card-enter .5s cubic-bezier(.34,1.56,.64,1) forwards; }
+    @keyframes card-enter { from{opacity:0;transform:translateY(40px) scale(.95);}to{opacity:1;transform:translateY(0) scale(1);} }
+    .auth-logo-icon { width:80px;height:80px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;margin:0 auto 1rem;box-shadow:0 8px 24px rgba(79,70,229,.4);animation:logo-bounce 2.5s ease-in-out infinite; }
+    @keyframes logo-bounce { 0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);} }
+    .auth-app-name { font-size:2.2rem;background:linear-gradient(135deg,#4f46e5,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.25rem; }
+    .auth-tagline { color:var(--text-muted);font-size:.88rem;letter-spacing:1.5px;font-weight:700;text-transform:uppercase; }
+    .auth-features { display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;margin-top:1.5rem;position:relative;z-index:1; }
+    .auth-feature-badge { background:rgba(255,255,255,.12);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 14px;border-radius:20px;font-size:.75rem;font-weight:700;display:flex;align-items:center;gap:5px;opacity:0;animation:badge-float .6s cubic-bezier(.34,1.56,.64,1) forwards; }
+    .auth-feature-badge:nth-child(1){animation-delay:.5s;}.auth-feature-badge:nth-child(2){animation-delay:.65s;}.auth-feature-badge:nth-child(3){animation-delay:.8s;}.auth-feature-badge:nth-child(4){animation-delay:.95s;}
+    @keyframes badge-float { from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);} }
+    .password-wrapper { position:relative; }
+    .password-toggle { position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-muted);font-size:1.1rem;user-select:none;padding:4px;line-height:1; }
+    .password-wrapper input { padding-right:44px; }
+    .password-strength { height:4px;border-radius:4px;background:#e5e7eb;margin-top:6px;overflow:hidden; }
+    .password-strength-bar { height:100%;border-radius:4px;transition:width .3s,background .3s;width:0%; }
+    .demo-accounts { background:#fffbeb;border:1px solid #fde68a;border-radius:var(--radius);padding:.75rem 1rem;margin-bottom:1rem;font-size:.82rem; }
+    .demo-accounts h5 { color:#92400e;font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.4rem;font-weight:800; }
+    .demo-row { display:flex;align-items:center;gap:6px;padding:2px 0;color:var(--text-muted);flex-wrap:wrap; }
+    .demo-row strong { color:var(--text); }
+    .demo-fill-btn { background:none;border:none;cursor:pointer;color:var(--primary);font-weight:700;font-size:.75rem;padding:2px 8px;border-radius:4px;margin-left:auto; }
+    .demo-fill-btn:hover { background:var(--primary-light); }
+    .school-suggestions { position:absolute;top:100%;left:0;right:0;background:#fff;border:2px solid var(--primary);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:160px;overflow-y:auto;z-index:100;box-shadow:var(--shadow-lg); }
+    .school-suggestion-item { padding:9px 16px;cursor:pointer;font-size:.88rem;transition:background .15s; }
+    .school-suggestion-item:hover { background:var(--primary-light);color:var(--primary); }
+    .btn-loading { position:relative;pointer-events:none;color:transparent!important; }
+    .btn-loading::after { content:'';position:absolute;width:18px;height:18px;border:3px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite; }
+    form.hidden { display:none!important; }
+    form.form-enter { animation:form-enter .25s ease forwards; }
+    @keyframes form-enter { from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);} }
+    .auth-particle { position:absolute;border-radius:50%;opacity:.12;animation:float-particle linear infinite;pointer-events:none; }
+    @keyframes float-particle { 0%{transform:translateY(100vh) rotate(0deg);opacity:0;}10%{opacity:.12;}90%{opacity:.12;}100%{transform:translateY(-20vh) rotate(720deg);opacity:0;} }
+  </style>
+</head>
+<body>
+
+<div class="auth-wrapper" id="auth-wrapper">
+  <div class="auth-bg-shapes">
+    <div class="auth-shape" style="width:500px;height:500px;top:-150px;right:-150px;animation-duration:25s;"></div>
+    <div class="auth-shape" style="width:300px;height:300px;bottom:-80px;left:-80px;animation-duration:18s;animation-delay:-5s;"></div>
+    <div class="auth-shape" style="width:180px;height:180px;top:40%;left:5%;animation-duration:22s;animation-delay:-10s;"></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:440px;position:relative;z-index:1;">
+
+    <div class="auth-card" style="width:100%;">
+
+      <!-- Logo -->
+      <div class="auth-logo">
+        <div class="auth-logo-icon">⚡</div>
+        <h1 class="auth-app-name" data-i18n="app_name">VidyaSpark</h1>
+        <p class="auth-tagline" data-i18n="tagline">Learn · Play · Grow</p>
+      </div>
+
+      <div id="auth-error"   class="alert alert-danger  hidden"></div>
+      <div id="auth-success" class="alert alert-success hidden"></div>
+
+      <!-- LOGIN -->
+      <form id="login-form" novalidate>
+        <div class="demo-accounts">
+          <h5>🎯 Demo Accounts — Click Fill to auto-login</h5>
+          <div class="demo-row">🎒 <strong>student@demo.com</strong> / demo123
+            <button type="button" class="demo-fill-btn" onclick="fillDemo('student')">Fill ↗</button>
+          </div>
+          <div class="demo-row">👩‍🏫 <strong>teacher@demo.com</strong> / demo123
+            <button type="button" class="demo-fill-btn" onclick="fillDemo('teacher')">Fill ↗</button>
+          </div>
+          <div class="demo-row">🛡 <strong>admin@demo.com</strong> / demo123
+            <button type="button" class="demo-fill-btn" onclick="fillDemo('admin')">Fill ↗</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" data-i18n="email">Email</label>
+          <input type="email" id="login-email" class="form-control" placeholder="you@school.edu" autocomplete="email" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="password">Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="login-password" class="form-control" placeholder="••••••••" autocomplete="current-password" required>
+            <span class="password-toggle" onclick="togglePw('login-password',this)">👁</span>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full btn-lg" id="login-btn" data-i18n="login">Login</button>
+        <div style="display:flex;justify-content:space-between;margin-top:1rem;font-size:.9rem;">
+          <a href="#" id="show-forgot" data-i18n="forgot_password">Forgot Password?</a>
+          <a href="#" id="show-signup">New here? <strong>Sign Up →</strong></a>
+        </div>
+      </form>
+
+      <!-- SIGNUP -->
+      <form id="signup-form" class="hidden" novalidate>
+        <div class="form-group">
+          <label class="form-label" data-i18n="select_role">I am a...</label>
+          <div class="role-selector">
+            <button type="button" class="role-btn active" data-role="student">
+              <span class="role-icon">🎒</span><span data-i18n="student">Student</span>
+            </button>
+            <button type="button" class="role-btn" data-role="teacher">
+              <span class="role-icon">👩‍🏫</span><span data-i18n="teacher">Teacher</span>
+            </button>
+            <button type="button" class="role-btn" data-role="admin">
+              <span class="role-icon">🛡️</span><span data-i18n="admin">Admin</span>
+            </button>
+          </div>
+        </div>
+        <input type="hidden" id="selected-role" value="student">
+
+        <div class="form-group">
+          <label class="form-label" data-i18n="name">Full Name</label>
+          <input type="text" id="signup-name" class="form-control" placeholder="Priya Sharma" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="email">Email</label>
+          <input type="email" id="signup-email" class="form-control" placeholder="priya@school.edu" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="password">Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="signup-password" class="form-control" placeholder="Min. 6 characters" required minlength="6">
+            <span class="password-toggle" onclick="togglePw('signup-password',this)">👁</span>
+          </div>
+          <div class="password-strength"><div class="password-strength-bar" id="pw-bar"></div></div>
+          <div id="pw-label" style="font-size:.73rem;margin-top:3px;color:var(--text-muted);min-height:1em;"></div>
+        </div>
+
+        <div id="class-select-wrap" class="form-group">
+          <label class="form-label" data-i18n="select_class">Select Class</label>
+          <select id="signup-class" class="form-control">
+            <option value="6">Class 6</option><option value="7">Class 7</option>
+            <option value="8">Class 8</option><option value="9" selected>Class 9</option>
+            <option value="10">Class 10</option><option value="11">Class 11</option>
+            <option value="12">Class 12</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="school-wrap">
+          <label class="form-label">School Name</label>
+          <div style="position:relative;">
+            <input type="text" id="signup-school" class="form-control" placeholder="e.g. Govt. High School, Raipur" autocomplete="off">
+            <div class="school-suggestions hidden" id="school-sugg"></div>
+          </div>
+        </div>
+
+        <div id="teacher-notice" class="alert alert-info hidden" style="font-size:.83rem;">
+          ℹ️ Teacher accounts require admin approval before you can log in.
+        </div>
+
+        <button type="submit" class="btn btn-success btn-full btn-lg" id="signup-btn">Create Account 🚀</button>
+        <div style="text-align:center;margin-top:1rem;font-size:.9rem;">
+          <a href="#" id="show-login">← Back to Login</a>
+        </div>
+      </form>
+
+      <!-- FORGOT PASSWORD -->
+      <form id="forgot-form" class="hidden" novalidate>
+        <div style="text-align:center;margin-bottom:1.5rem;">
+          <div style="font-size:3rem;margin-bottom:.5rem;">🔑</div>
+          <h3 style="margin-bottom:.25rem;" data-i18n="forgot_password">Forgot Password?</h3>
+          <p style="color:var(--text-muted);font-size:.88rem;">Enter your email and we'll send a reset link.</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="email">Email</label>
+          <input type="email" id="forgot-email" class="form-control" placeholder="your@email.com" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="forgot-btn" data-i18n="send_reset">Send Reset Email</button>
+        <div style="text-align:center;margin-top:1rem;font-size:.9rem;">
+          <a href="#" id="show-login-2">← Back to Login</a>
+        </div>
+      </form>
+
+      <!-- Language toggle -->
+      <div style="margin-top:1.5rem;display:flex;justify-content:center;">
+        <div class="lang-toggle lang-switcher">
+          <span>🌐</span>
+          <span class="lang-btn active" data-lang="en">EN</span>
+          <span class="lang-btn" data-lang="hi">हि</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature badges -->
+    <div class="auth-features">
+      <div class="auth-feature-badge">🎮 Gamified Learning</div>
+      <div class="auth-feature-badge">📴 Offline Support</div>
+      <div class="auth-feature-badge">🌐 Hindi + English</div>
+      <div class="auth-feature-badge">🏆 Leaderboards</div>
+    </div>
+
+  </div>
+</div>
+
+<script src="firebase/firebase-config.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/auth.js"></script>
+<script>
+// Form switching
+function showForm(id) {
+  ['login','signup','forgot'].forEach(f => document.getElementById(f+'-form').classList.add('hidden'));
+  const t = document.getElementById(id+'-form');
+  t.classList.remove('hidden');
+  t.classList.add('form-enter');
+  setTimeout(() => t.classList.remove('form-enter'), 300);
+  ['auth-error','auth-success'].forEach(id => document.getElementById(id).classList.add('hidden'));
+}
+document.getElementById('show-signup').onclick  = e => { e.preventDefault(); showForm('signup'); };
+document.getElementById('show-login').onclick   = e => { e.preventDefault(); showForm('login'); };
+document.getElementById('show-login-2').onclick = e => { e.preventDefault(); showForm('login'); };
+document.getElementById('show-forgot').onclick  = e => { e.preventDefault(); showForm('forgot'); };
+
+// Role buttons
+document.querySelectorAll('.role-btn').forEach(btn => btn.addEventListener('click', () => {
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const role = btn.dataset.role;
+  document.getElementById('selected-role').value = role;
+  document.getElementById('class-select-wrap').classList.toggle('hidden', role !== 'student');
+  document.getElementById('school-wrap').style.display = role === 'admin' ? 'none' : '';
+  document.getElementById('teacher-notice').classList.toggle('hidden', role !== 'teacher');
+}));
+
+// Password toggle
+function togglePw(id, btn) {
+  const el = document.getElementById(id);
+  const isHidden = el.type === 'password';
+  el.type = isHidden ? 'text' : 'password';
+  btn.textContent = isHidden ? '🙈' : '👁';
+}
+
+// Password strength
+document.getElementById('signup-password').addEventListener('input', function() {
+  const v = this.value, bar = document.getElementById('pw-bar'), lbl = document.getElementById('pw-label');
+  let s = 0;
+  if (v.length >= 6) s++; if (v.length >= 10) s++; if (/[A-Z]/.test(v)) s++;
+  if (/[0-9]/.test(v)) s++; if (/[^A-Za-z0-9]/.test(v)) s++;
+  const L = [['0%','#e5e7eb',''],['20%','#ef4444','😬 Weak'],['45%','#f59e0b','🤔 Fair'],['65%','#3b82f6','👍 Good'],['85%','#10b981','💪 Strong'],['100%','#059669','🔒 Very Strong']];
+  const l = L[Math.min(s, 5)];
+  bar.style.width = v ? l[0] : '0%'; bar.style.background = l[1]; lbl.textContent = v ? l[2] : '';
+});
+
+// School suggestions
+const SCHOOLS = ['Govt. High School, Raipur','Kendriya Vidyalaya, Delhi','Navodaya Vidyalaya, Patna','Govt. Middle School, Jaipur','Saraswati Shishu Mandir, Lucknow','Govt. Higher Secondary, Bhopal','Eklavya Model School, Ranchi','Atal Adarsh Vidyalaya, Bilaspur','Govt. High School, Nagpur','Govt. School, Varanasi'];
+const si = document.getElementById('signup-school'), ss = document.getElementById('school-sugg');
+si.addEventListener('input', () => {
+  const q = si.value.toLowerCase();
+  if (q.length < 2) { ss.classList.add('hidden'); return; }
+  const m = SCHOOLS.filter(s => s.toLowerCase().includes(q));
+  if (!m.length) { ss.classList.add('hidden'); return; }
+  ss.innerHTML = m.map(s => `<div class="school-suggestion-item" onclick="pickSchool('${s}')">${s}</div>`).join('');
+  ss.classList.remove('hidden');
+});
+function pickSchool(n) { si.value = n; ss.classList.add('hidden'); }
+document.addEventListener('click', e => { if (!si.contains(e.target)) ss.classList.add('hidden'); });
+
+// Demo filler
+function fillDemo(role) {
+  document.getElementById('login-email').value = role+'@demo.com';
+  document.getElementById('login-password').value = 'demo123';
+}
+
+// Button loading
+function setBtnLoading(id, on) {
+  const b = document.getElementById(id);
+  b.classList.toggle('btn-loading', on);
+  b.disabled = on;
+}
+
+// Login
+document.getElementById('login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const pw    = document.getElementById('login-password').value;
+  if (!email || !pw) return Auth.showError('Please fill in all fields.');
+  setBtnLoading('login-btn', true);
+  try { await Auth.signIn(email, pw); }
+  catch(err) { Auth.showError(err.message); setBtnLoading('login-btn', false); }
+});
+
+// Signup
+document.getElementById('signup-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name  = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pw    = document.getElementById('signup-password').value;
+  const role  = document.getElementById('selected-role').value;
+  const cls   = document.getElementById('signup-class').value;
+  const sch   = document.getElementById('signup-school').value.trim();
+  if (!name)       return Auth.showError('Please enter your full name.');
+  if (!email)      return Auth.showError('Please enter your email.');
+  if (pw.length<6) return Auth.showError('Password must be at least 6 characters.');
+  setBtnLoading('signup-btn', true);
+  try { await Auth.signUp({ name, email, password:pw, role, classGrade:cls, schoolName:sch }); }
+  catch(err) { Auth.showError(err.message); setBtnLoading('signup-btn', false); }
+});
+
+// Forgot password
+document.getElementById('forgot-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email) return Auth.showError('Please enter your email.');
+  setBtnLoading('forgot-btn', true);
+  try {
+    await Auth.resetPassword(email);
+    document.getElementById('auth-error').classList.add('hidden');
+    const s = document.getElementById('auth-success');
+    s.textContent = '✅ ' + I18n.t('reset_sent');
+    s.classList.remove('hidden');
+    setTimeout(() => showForm('login'), 3500);
+  } catch(err) { Auth.showError(err.message); }
+  finally { setBtnLoading('forgot-btn', false); }
+});
+
+// Auto-redirect if already logged in
+auth.onAuthStateChanged(user => {
+  if (user) {
+    db.collection('users').doc(user.uid).get()
+      .then(snap => { if (snap.exists) Auth.redirectByRole(snap.data().role); })
+      .catch(console.error);
+  }
+});
+
+// Language toggle
+I18n.initLangToggle();
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () =>
+    navigator.serviceWorker.register('/service-worker.js').catch(console.error)
+  );
+}
+
+// Floating particles
+(function(){
+  const w = document.getElementById('auth-wrapper');
+  for(let i=0;i<8;i++){
+    const p = document.createElement('div');
+    p.className = 'auth-particle';
+    const sz = 20 + Math.random()*60;
+    p.style.cssText = `width:${sz}px;height:${sz}px;left:${Math.random()*100}%;background:rgba(255,255,255,.08);animation-duration:${10+Math.random()*15}s;animation-delay:-${Math.random()*20}s;`;
+    w.appendChild(p);
+  }
+})();
+</script>
+</body>
+</html>
