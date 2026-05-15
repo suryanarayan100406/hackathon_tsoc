@@ -57,7 +57,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeSubject, setActiveSubject] = useState(0)
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'quests' | 'leaderboard' | 'profile'>('quests')
   const [leaderboard, setLeaderboard] = useState<any[]>([])
   const [lbLoading, setLbLoading] = useState(false)
@@ -242,99 +242,121 @@ export default function DashboardPage() {
           </motion.div>
         )}
 
-        {/* Quest Map */}
-        {activeTab === 'quests' && subjects && subjects.length > 0 && (
+        {/* ── QUESTS TAB: Subject Cards ── */}
+        {activeTab === 'quests' && subjects && subjects.length > 0 && !selectedSubject && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            {/* Subject Tabs */}
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-4">
-              {subjects.map((subject, idx) => (
-                <button
-                  key={subject.id}
-                  onClick={() => setActiveSubject(idx)}
-                  className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all"
-                  style={{
-                    background: activeSubject === idx ? 'var(--primary)' : 'var(--bg-secondary)',
-                    color: activeSubject === idx ? 'white' : 'var(--text-muted)',
-                    border: '1px solid var(--border-color)',
-                  }}
-                >
-                  <span>{subject.icon}</span>
-                  {subject.name}
-                </button>
-              ))}
+            <h2 className="font-bold text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>📚 Choose a Subject</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {subjects.map((subject: any) => {
+                const totalQuests = subject.units.reduce((s: number, u: any) => s + u.quests.length, 0)
+                const doneQuests = subject.units.reduce((s: number, u: any) =>
+                  s + u.quests.filter((q: any) => !!q.progress).length, 0)
+                const pct = totalQuests > 0 ? Math.round((doneQuests / totalQuests) * 100) : 0
+                return (
+                  <motion.button
+                    key={subject.id}
+                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                    onClick={() => setSelectedSubject(subject.id)}
+                    className="glass-card p-5 rounded-2xl text-left flex flex-col gap-3"
+                    style={{ border: '1px solid var(--border-color)' }}
+                  >
+                    <div className="text-4xl">{subject.icon}</div>
+                    <div>
+                      <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{subject.name}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{totalQuests} quests</p>
+                    </div>
+                    {/* Mini progress bar */}
+                    <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-tertiary)' }}>
+                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: subject.color || 'var(--primary)' }} />
+                    </div>
+                    <p className="text-xs font-semibold" style={{ color: subject.color || 'var(--primary)' }}>{pct}% complete</p>
+                  </motion.button>
+                )
+              })}
             </div>
-
-            {/* Quests List */}
-            {activeSubjectData && (
-              <div className="space-y-3">
-                {activeSubjectData.units.map((unit) => (
-                  <div key={unit.id}>
-                    <div className="flex items-center gap-2 mb-2 px-1">
-                      <Map size={14} style={{ color: 'var(--text-muted)' }} />
-                      <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                        {unit.name}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      {unit.quests.map((quest, qIdx) => {
-                        const completed = !!quest.progress
-                        const stars = quest.progress?.stars ?? 0
-                        const isLocked = qIdx > 0 && !unit.quests[qIdx - 1].progress
-                        return (
-                          <motion.div
-                            key={quest.id}
-                            whileHover={!isLocked ? { scale: 1.01 } : {}}
-                            whileTap={!isLocked ? { scale: 0.99 } : {}}
-                            onClick={() => !isLocked && router.push(`/quests/${quest.id}`)}
-                            className={`glass-card p-4 rounded-xl flex items-center gap-3 ${!isLocked ? 'cursor-pointer' : 'opacity-50'}`}
-                            style={{ border: `1px solid ${completed ? 'var(--accent)' : 'var(--border-color)'}` }}
-                          >
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-                              style={{
-                                background: completed
-                                  ? 'linear-gradient(135deg, var(--accent), var(--primary))'
-                                  : isLocked ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
-                              }}>
-                              {isLocked ? <Lock size={16} style={{ color: 'var(--text-muted)' }} /> :
-                                completed ? '✅' :
-                                  quest.type === 'QUIZ' ? '📝' :
-                                    quest.type === 'LAB' ? '🔬' : '🎯'}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>
-                                {quest.title}
-                              </p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                                  style={{
-                                    background: `${difficultyColor[quest.difficulty]}20`,
-                                    color: difficultyColor[quest.difficulty]
-                                  }}>
-                                  {quest.difficulty}
-                                </span>
-                                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                  +{quest.xpReward} XP
-                                </span>
-                                {completed && (
-                                  <span className="text-xs">
-                                    {'⭐'.repeat(stars)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {!isLocked && (
-                              <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} className="flex-shrink-0" />
-                            )}
-                          </motion.div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </motion.div>
         )}
+
+        {/* ── SUBJECT DRILL-IN: Units + Quests ── */}
+        {activeTab === 'quests' && selectedSubject && (() => {
+          const subj = subjects?.find((s: any) => s.id === selectedSubject)
+          if (!subj) return null
+          return (
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+              {/* Back + Subject Header */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedSubject(null)}
+                  className="p-2 rounded-xl flex items-center justify-center"
+                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
+                >
+                  <ChevronRight size={18} style={{ transform: 'rotate(180deg)' }} />
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-3xl">{subj.icon}</span>
+                  <div>
+                    <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>{subj.name}</h2>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {subj.units.reduce((s: number, u: any) => s + u.quests.length, 0)} quests across {subj.units.length} units
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Units and Quests */}
+              {subj.units.map((unit: any) => (
+                <div key={unit.id}>
+                  <div className="flex items-center gap-2 mb-2 px-1">
+                    <Map size={14} style={{ color: 'var(--text-muted)' }} />
+                    <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                      {unit.name}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {unit.quests.map((quest: any, qIdx: number) => {
+                      const completed = !!quest.progress
+                      const stars = quest.progress?.stars ?? 0
+                      const isLocked = qIdx > 0 && !unit.quests[qIdx - 1].progress
+                      return (
+                        <motion.div
+                          key={quest.id}
+                          whileHover={!isLocked ? { scale: 1.01 } : {}}
+                          whileTap={!isLocked ? { scale: 0.99 } : {}}
+                          onClick={() => !isLocked && router.push(`/quests/${quest.id}`)}
+                          className={`glass-card p-4 rounded-xl flex items-center gap-3 ${!isLocked ? 'cursor-pointer' : 'opacity-50'}`}
+                          style={{ border: `1px solid ${completed ? 'var(--accent)' : 'var(--border-color)'}` }}
+                        >
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+                            style={{
+                              background: completed
+                                ? 'linear-gradient(135deg, var(--accent), var(--primary))'
+                                : isLocked ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+                            }}>
+                            {isLocked ? <Lock size={16} style={{ color: 'var(--text-muted)' }} /> :
+                              completed ? '✅' :
+                                quest.type === 'QUIZ' ? '📝' : '🎯'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>{quest.title}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                                style={{ background: `${difficultyColor[quest.difficulty]}20`, color: difficultyColor[quest.difficulty] }}>
+                                {quest.difficulty}
+                              </span>
+                              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>+{quest.xpReward} XP</span>
+                              {completed && <span className="text-xs">{'⭐'.repeat(stars)}</span>}
+                            </div>
+                          </div>
+                          {!isLocked && <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} className="flex-shrink-0" />}
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </motion.div>
+          )
+        })()}
 
         {/* Empty state */}
         {activeTab === 'quests' && (!subjects || subjects.length === 0) && (
