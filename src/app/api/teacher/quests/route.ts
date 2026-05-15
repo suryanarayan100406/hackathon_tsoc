@@ -18,7 +18,10 @@ export async function GET(req: NextRequest) {
       units: {
         where: { grade },
         orderBy: { order: 'asc' },
-        include: { quests: { orderBy: { order: 'asc' } } },
+        include: { 
+          quests: { orderBy: { order: 'asc' } },
+          contents: { orderBy: { createdAt: 'asc' } }
+        },
       },
     },
   })

@@ -183,6 +183,9 @@ export default function Dashboard() {
           <button className={`nav-item${tab==='quests'?' active':''}`} onClick={() => { setTab('quests'); setSelectedSubject(null) }}>
             <span className="nav-icon">🏠</span> Dashboard
           </button>
+          <a href="/quests/content" className="nav-item" style={{textDecoration:'none'}}>
+            <span className="nav-icon">📚</span> Learning Content
+          </a>
           <button className={`nav-item${tab==='leaderboard'?' active':''}`} onClick={() => setTab('leaderboard')}>
             <span className="nav-icon">🏆</span> Leaderboard
           </button>

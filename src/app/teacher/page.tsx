@@ -2,6 +2,8 @@
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import ContentUploadModal from '@/components/ContentUploadModal'
+import TeacherContentManager from '@/components/TeacherContentManager'
 
 export default function TeacherPage() {
   const { data: session, status } = useSession()
@@ -18,6 +20,9 @@ export default function TeacherPage() {
   const [questions, setQuestions] = useState([emptyQ()])
   const [form, setForm] = useState({ subjectSlug: '', unitName: '', title: '', type: 'QUIZ', difficulty: 'EASY', xpReward: 50, timeLimit: 300 })
   const [subjForm, setSubjForm] = useState({ name: '', icon: '📚', color: '#4f46e5' })
+  const [showContentModal, setShowContentModal] = useState(false)
+  const [content, setContent] = useState<any[]>([])
+  const [contentLoading, setContentLoading] = useState(false)
 
   function emptyQ() { return { id: Math.random().toString(36).slice(2), question: '', options: ['', '', '', ''], correct: 0, explanation: '' } }
 
@@ -29,6 +34,9 @@ export default function TeacherPage() {
     if (status !== 'authenticated') return
     setLoading(true)
     fetch(`/api/teacher/quests?grade=${grade}`).then(r => r.json()).then(d => setSubjects(d.subjects || [])).finally(() => setLoading(false))
+    // Load content as well
+    setContentLoading(true)
+    fetch(`/api/teacher/content?grade=${grade}`).then(r => r.json()).then(d => setContent(d.content || [])).finally(() => setContentLoading(false))
   }, [grade, status])
 
   const totalQuests = subjects.reduce((n, s) => n + s.units.reduce((m: number, u: any) => m + u.quests.length, 0), 0)
@@ -104,13 +112,16 @@ export default function TeacherPage() {
           <div><div className="logo-text">VidyaQuest</div><div className="logo-sub">Teacher Portal</div></div>
         </div>
         <nav style={{flex:1,padding:'1rem 0'}}>
-          {[['overview','📊','Overview'],['courses','📚','My Courses'],['students','👩‍🎓','Students']].map(([id,icon,label]) => (
+          {[['overview','📊','Overview'],['courses','📚','My Quests'],['content','📂','Learning Content'],['students','👩‍🎓','Students']].map(([id,icon,label]) => (
             <div key={id} className={`nav-item${section===id?' active':''}`} style={{display:'flex',alignItems:'center',gap:'.75rem',padding:'.75rem 1.25rem',cursor:'pointer',fontWeight:600,fontSize:'.9rem',textDecoration:'none'}} onClick={() => setSection(id)}>
               <span>{icon}</span>{label}
             </div>
           ))}
           <div className="nav-item" style={{display:'flex',alignItems:'center',gap:'.75rem',padding:'.75rem 1.25rem',cursor:'pointer',fontWeight:600,fontSize:'.9rem',color:'#c7d2fe',borderLeft:'3px solid transparent'}} onClick={() => { setMsg({type:'',text:''}); setShowQuestModal(true) }}>
             <span>➕</span>Add Quest
+          </div>
+          <div className="nav-item" style={{display:'flex',alignItems:'center',gap:'.75rem',padding:'.75rem 1.25rem',cursor:'pointer',fontWeight:600,fontSize:'.9rem',color:'#c7d2fe',borderLeft:'3px solid transparent'}} onClick={() => { setMsg({type:'',text:''}); setShowContentModal(true) }}>
+            <span>⬆️</span>Upload Content
           </div>
           <div className="nav-item" style={{display:'flex',alignItems:'center',gap:'.75rem',padding:'.75rem 1.25rem',cursor:'pointer',fontWeight:600,fontSize:'.9rem',color:'#ef4444',borderLeft:'3px solid transparent'}} onClick={() => signOut({ callbackUrl:'/login' })}>
             <span>🚪</span>Logout
@@ -156,8 +167,15 @@ export default function TeacherPage() {
 
         {section === 'courses' && (
           <>
-            <div className="page-header"><div><h1 style={{fontSize:'1.7rem',fontWeight:900}}>My Courses</h1><p style={{color:'#6b7280',fontSize:'.9rem'}}>Published quests for Grade {grade}</p></div><button className="btn btn-primary" onClick={() => setShowQuestModal(true)}>+ New Quest</button></div>
+            <div className="page-header"><div><h1 style={{fontSize:'1.7rem',fontWeight:900}}>My Quests</h1><p style={{color:'#6b7280',fontSize:'.9rem'}}>Published quests for Grade {grade}</p></div><button className="btn btn-primary" onClick={() => setShowQuestModal(true)}>+ New Quest</button></div>
             <QuestList subjects={subjects} loading={loading} grade={grade} expandedSubject={expandedSubject} setExpandedSubject={setExpandedSubject} onAdd={() => setShowQuestModal(true)} />
+          </>
+        )}
+
+        {section === 'content' && (
+          <>
+            <div className="page-header"><div><h1 style={{fontSize:'1.7rem',fontWeight:900}}>Learning Content</h1><p style={{color:'#6b7280',fontSize:'.9rem'}}>Manage PDFs, videos, documents, audio & links for Grade {grade}</p></div><button className="btn btn-primary" onClick={() => { setMsg({type:'',text:''}); setShowContentModal(true) }}>⬆️ Upload Content</button></div>
+            <TeacherContentManager content={content} onDelete={(id) => setContent(c => c.filter(ci => ci.id !== id))} loading={contentLoading} />
           </>
         )}
 
@@ -242,6 +260,15 @@ export default function TeacherPage() {
           </div>
         </div>
       )}
+
+      {/* UPLOAD CONTENT MODAL */}
+      <ContentUploadModal 
+        isOpen={showContentModal} 
+        onClose={() => setShowContentModal(false)} 
+        subjects={subjects}
+        grade={grade}
+        onSuccess={() => fetch(`/api/teacher/content?grade=${grade}`).then(r => r.json()).then(d => setContent(d.content || []))}
+      />
     </>
   )
 }
