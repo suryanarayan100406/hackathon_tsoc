@@ -1,9 +1,13 @@
 import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
+import { PrismaLibSql } from '@prisma/adapter-libsql'
+import { createClient } from '@libsql/client'
 import bcrypt from 'bcryptjs'
 import { BADGE_DEFINITIONS, SUBJECT_THEMES, QUEST_TYPES } from '../src/lib/gamification'
 
-const prisma = new PrismaClient()
+const libsql = createClient({ url: process.env.DATABASE_URL || 'file:./dev.db' })
+const adapter = new PrismaLibSql(libsql)
+const prisma = new PrismaClient({ adapter })
 
 async function main() {
   console.log('🌱 Starting database seeding...')
