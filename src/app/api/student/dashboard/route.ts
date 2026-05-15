@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        badges: { include: { badge: true } },
+        userBadges: { include: { badge: true } },
       },
     })
 
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
     })
 
     // Format badges
-    const formattedBadges = user.badges.map((ub) => ({
+    const formattedBadges = user.userBadges.map((ub) => ({
       id: ub.badge.id,
       name: ub.badge.name,
       icon: ub.badge.icon,

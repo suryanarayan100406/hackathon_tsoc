@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       select: {
         id: true, name: true, xp: true, level: true,
         streakDays: true, grade: true,
-        _count: { select: { progress: true } },
+        _count: { select: { questProgress: true } },
       },
     })
 
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
         level: s.level,
         streakDays: s.streakDays,
         grade: s.grade,
-        questsDone: s._count.progress,
+        questsDone: s._count.questProgress,
         isMe: s.id === currentUserId,
       }))
     })

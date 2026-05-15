@@ -80,8 +80,8 @@ export default function ContentDisplay({ content, filter, language = 'en' }: Con
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {filteredContent.map(item => {
-        const displayTitle = getTranslated(item.titleJson || '{}', language, item.title)
-        const displayDesc = getTranslated(item.descJson || '{}', language, item.description)
+        const displayTitle = item.title
+        const displayDesc = item.description
         
         return (
           <div key={item.id} className="border rounded-lg hover:shadow-lg transition overflow-hidden">

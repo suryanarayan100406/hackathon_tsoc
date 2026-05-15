@@ -58,14 +58,9 @@ export async function POST(request: NextRequest) {
         }
 
         // Check for duplicate (based on quest and timestamp window)
-        const existingProgress = await prisma.questProgress.findFirst({
+        const existingProgress = await prisma.questProgress.findUnique({
           where: {
-            userId,
-            questId: completion.questId,
-            createdAt: {
-              gte: new Date(completion.completedAt - 60000), // Within 1 minute
-              lte: new Date(completion.completedAt + 60000)
-            }
+            userId_questId: { userId, questId: completion.questId }
           }
         })
 
@@ -75,15 +70,15 @@ export async function POST(request: NextRequest) {
         }
 
         // Create progress record
-        await prisma.questProgress.create({
-          data: {
+        await prisma.questProgress.upsert({
+          where: { userId_questId: { userId, questId: completion.questId } },
+          update: {},
+          create: {
             userId,
             questId: completion.questId,
             score: completion.score,
-            totalQuestions: completion.totalQuestions,
-            timeSpent: completion.timeSpent,
+            stars: 0,
             xpEarned: completion.xpEarned,
-            createdAt: new Date(completion.completedAt)
           }
         })
 

@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        badges: { include: { badge: true } },
-        progress: {
+        userBadges: { include: { badge: true } },
+        questProgress: {
           include: {
             quest: {
               include: { unit: { include: { subject: true } } }
@@ -35,15 +35,15 @@ export async function GET(req: NextRequest) {
     let totalScore = 0
     const subjectBreakdown: Record<string, number> = {}
 
-    user.progress.forEach(p => {
+    user.questProgress.forEach(p => {
       totalStars += p.stars
       totalScore += p.score
       const subjectSlug = p.quest.unit.subject.slug
       subjectBreakdown[subjectSlug] = (subjectBreakdown[subjectSlug] || 0) + 1
     })
 
-    const avgScore = user.progress.length > 0 
-      ? Math.round(totalScore / user.progress.length) 
+    const avgScore = user.questProgress.length > 0 
+      ? Math.round(totalScore / user.questProgress.length) 
       : 0
 
     // Fake streak history since we don't have a separate table for daily logins
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
       { date: new Date().toISOString().split('T')[0], count: user.streakDays }
     ]
 
-    const formattedBadges = user.badges.map((ub) => ({
+    const formattedBadges = user.userBadges.map((ub) => ({
       id: ub.badge.id,
       name: ub.badge.name,
       icon: ub.badge.icon,
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
         grade: user.grade,
       },
       stats: {
-        totalQuests: user.progress.length,
+        totalQuests: user.questProgress.length,
         totalStars,
         avgScore,
         timeSpent: 0, // Not tracked in DB currently

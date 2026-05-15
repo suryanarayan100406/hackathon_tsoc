@@ -33,8 +33,8 @@ export async function POST(
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        badges: { include: { badge: true } },
-        progress: { include: { quest: { include: { unit: { include: { subject: true } } } } } }
+        userBadges: { include: { badge: true } },
+        questProgress: { include: { quest: { include: { unit: { include: { subject: true } } } } } }
       }
     })
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -82,10 +82,10 @@ export async function POST(
     // 6. Badge unlocking
     const newBadges: any[] = []
     const allBadgesInDB = await prisma.badge.findMany()
-    const userBadgeTriggers = user.badges.map(ub => ub.badge.trigger)
+    const userBadgeTriggers = user.userBadges.map(ub => ub.badge.trigger)
 
     const allProgress = [
-      ...user.progress,
+      ...user.questProgress,
       ...(existing ? [] : [{ quest }]) // include this quest if first time
     ]
     const subjectSlugsCompleted = new Set(
@@ -101,7 +101,7 @@ export async function POST(
       let unlocked = false
       switch (badgeDef.trigger) {
         case 'FIRST_QUEST':
-          unlocked = user.progress.length === 0 && !existing
+          unlocked = user.questProgress.length === 0 && !existing
           break
         case 'LEVEL_2': unlocked = newLevelInfo.level >= 2; break
         case 'LEVEL_4': unlocked = newLevelInfo.level >= 4; break
