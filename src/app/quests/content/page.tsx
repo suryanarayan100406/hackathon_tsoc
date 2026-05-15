@@ -8,14 +8,30 @@ export default function StudentContentPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [content, setContent] = useState<any[]>([])
+  const [subjects, setSubjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState('')
   const [subjectFilter, setSubjectFilter] = useState('')
+  const [userGrade, setUserGrade] = useState(8)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
 
+  // Fetch user's grade and subjects on mount
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    
+    fetch('/api/student/dashboard')
+      .then(r => r.json())
+      .then(d => {
+        if (d.user?.grade) setUserGrade(d.user.grade)
+        if (d.subjects) setSubjects(d.subjects)
+      })
+      .catch(console.error)
+  }, [status])
+
+  // Fetch content based on filter
   useEffect(() => {
     if (status !== 'authenticated') return
     
@@ -23,10 +39,12 @@ export default function StudentContentPage() {
     const query = new URLSearchParams()
     if (subjectFilter) query.append('subjectSlug', subjectFilter)
     
-    fetch(`/api/student/content?${query}`).then(r => r.json()).then(d => setContent(d.content || [])).finally(() => setLoading(false))
+    fetch(`/api/student/content?${query}`)
+      .then(r => r.json())
+      .then(d => setContent(d.content || []))
+      .finally(() => setLoading(false))
   }, [status, subjectFilter])
 
-  const subjects = Array.from(new Map(content.map(c => [c.unit.subject.slug, c.unit.subject])).values())
   const contentTypes = ['PDF', 'DOCUMENT', 'VIDEO', 'AUDIO', 'LINK']
   const filteredContent = typeFilter ? content.filter(c => c.type === typeFilter) : content
 

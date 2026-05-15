@@ -2,8 +2,6 @@
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import ContentUploadModal from '@/components/ContentUploadModal'
-import TeacherContentManager from '@/components/TeacherContentManager'
 
 export default function TeacherPage() {
   const { data: session, status } = useSession()
@@ -21,8 +19,8 @@ export default function TeacherPage() {
   const [form, setForm] = useState({ subjectSlug: '', unitName: '', title: '', type: 'QUIZ', difficulty: 'EASY', xpReward: 50, timeLimit: 300 })
   const [subjForm, setSubjForm] = useState({ name: '', icon: '📚', color: '#4f46e5' })
   const [showContentModal, setShowContentModal] = useState(false)
-  const [content, setContent] = useState<any[]>([])
-  const [contentLoading, setContentLoading] = useState(false)
+  const [contentForm, setContentForm] = useState({ title: '', description: '', unitId: '' })
+  const [contentFile, setContentFile] = useState<File | null>(null)
 
   function emptyQ() { return { id: Math.random().toString(36).slice(2), question: '', options: ['', '', '', ''], correct: 0, explanation: '' } }
 
@@ -34,9 +32,6 @@ export default function TeacherPage() {
     if (status !== 'authenticated') return
     setLoading(true)
     fetch(`/api/teacher/quests?grade=${grade}`).then(r => r.json()).then(d => setSubjects(d.subjects || [])).finally(() => setLoading(false))
-    // Load content as well
-    setContentLoading(true)
-    fetch(`/api/teacher/content?grade=${grade}`).then(r => r.json()).then(d => setContent(d.content || [])).finally(() => setContentLoading(false))
   }, [grade, status])
 
   const totalQuests = subjects.reduce((n, s) => n + s.units.reduce((m: number, u: any) => m + u.quests.length, 0), 0)

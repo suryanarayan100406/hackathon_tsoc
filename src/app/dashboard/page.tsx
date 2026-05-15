@@ -302,6 +302,21 @@ export default function Dashboard() {
             {subj.units.map((unit: any) => (
               <div key={unit.id} style={{marginBottom:'1.5rem'}}>
                 <div className="unit-label">📂 {unit.name}</div>
+                {unit.contents && unit.contents.length > 0 && unit.contents.map((c: any) => (
+                  <div key={c.id} className="quest-item" onClick={() => window.open(c.fileUrl, '_blank')}>
+                    <div className="quest-icon" style={{background: '#fef3c7'}}>
+                      {c.type === 'VIDEO' ? '🎥' : c.type === 'AUDIO' ? '🎧' : '📄'}
+                    </div>
+                    <div style={{flex:1}}>
+                      <p style={{fontWeight:700,fontSize:'.95rem'}}>{c.title}</p>
+                      <div style={{display:'flex',gap:'.5rem',marginTop:'.25rem',alignItems:'center'}}>
+                        <span className="pill" style={{background:'#fef3c7',color:'#92400e'}}>{c.type}</span>
+                        {c.description && <span style={{fontSize:'.78rem',color:'var(--muted)'}}>{c.description}</span>}
+                      </div>
+                    </div>
+                    <span style={{color:'var(--muted)',fontSize:'1.2rem'}}>›</span>
+                  </div>
+                ))}
                 {unit.quests.map((q: any) => {
                   const done = !!q.progress
                   const stars = q.progress?.stars ?? 0
