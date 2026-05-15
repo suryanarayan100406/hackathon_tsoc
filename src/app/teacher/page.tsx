@@ -337,29 +337,66 @@ export default function TeacherPage() {
               <p className="text-3xl mb-2">📭</p>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No quests for Grade {grade} yet. Add one above!</p>
             </div>
-          ) : subjects.map(subject => subject.units.filter(u => u.quests.length > 0).map(unit => (
-            <div key={unit.id} className="glass-card p-4 rounded-2xl" style={{ border: '1px solid var(--border-color)' }}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-lg">{subject.icon}</span>
-                <div>
-                  <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{subject.name}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{unit.name}</p>
-                </div>
+          ) : subjects.filter(s => s.units.some(u => u.quests.length > 0)).map(subject => (
+            <div key={subject.id} className="glass-card p-4 rounded-2xl" style={{ border: '1px solid var(--border-color)' }}>
+              {/* Subject header — shown ONCE */}
+              <div 
+                className="flex items-center gap-2 cursor-pointer select-none" 
+                style={{ 
+                  borderBottom: expandedSubject === subject.id ? '1px solid var(--border-color)' : 'none',
+                  paddingBottom: expandedSubject === subject.id ? '0.75rem' : '0',
+                  marginBottom: expandedSubject === subject.id ? '0.75rem' : '0'
+                }}
+                onClick={() => setExpandedSubject(prev => prev === subject.id ? null : subject.id)}
+              >
+                <span className="text-2xl">{subject.icon}</span>
+                <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{subject.name}</p>
+                <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>
+                  {subject.units.reduce((t, u) => t + u.quests.length, 0)} quests
+                </span>
+                <motion.div
+                  animate={{ rotate: expandedSubject === subject.id ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="ml-2"
+                >
+                  <ChevronDown size={20} style={{ color: 'var(--text-muted)' }} />
+                </motion.div>
               </div>
-              {unit.quests.map(q => (
-                <div key={q.id} className="flex items-center justify-between py-2 border-t" style={{ borderColor: 'var(--border-color)' }}>
-                  <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{q.title}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                      background: q.difficulty === 'EASY' ? 'rgba(6,214,160,0.15)' : q.difficulty === 'MEDIUM' ? 'rgba(255,209,102,0.15)' : 'rgba(239,71,111,0.15)',
-                      color: q.difficulty === 'EASY' ? '#06d6a0' : q.difficulty === 'MEDIUM' ? '#ffd166' : '#ef476f'
-                    }}>{q.difficulty}</span>
-                    <span className="text-xs" style={{ color: 'var(--accent)' }}>+{q.xpReward}XP</span>
-                  </div>
-                </div>
-              ))}
+
+              {/* Units nested under subject */}
+              <AnimatePresence>
+                {expandedSubject === subject.id && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    {subject.units.filter(u => u.quests.length > 0).map(unit => (
+                      <div key={unit.id} className="mb-4 last:mb-0 pt-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider mb-2 px-1" style={{ color: 'var(--text-muted)' }}>
+                          📂 {unit.name}
+                        </p>
+                        {unit.quests.map(q => (
+                          <div key={q.id} className="flex items-center justify-between py-2 px-2 rounded-lg mb-1 last:mb-0"
+                            style={{ background: 'var(--bg-tertiary)' }}>
+                            <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{q.title}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                                background: q.difficulty === 'EASY' ? 'rgba(6,214,160,0.15)' : q.difficulty === 'MEDIUM' ? 'rgba(255,209,102,0.15)' : 'rgba(239,71,111,0.15)',
+                                color: q.difficulty === 'EASY' ? '#06d6a0' : q.difficulty === 'MEDIUM' ? '#ffd166' : '#ef476f'
+                              }}>{q.difficulty}</span>
+                              <span className="text-xs" style={{ color: 'var(--accent)' }}>+{q.xpReward}XP</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          )))}
+          ))}
         </div>
       </div>
     </div>

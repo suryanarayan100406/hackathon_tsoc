@@ -1,402 +1,191 @@
 'use client'
-
-import { useState } from 'react'
-import { signIn } from 'next-auth/react'
+import { useState, useEffect } from 'react'
+import { signIn, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { useTheme } from '@/components/providers/ThemeProvider'
-import {
-  Mail, Lock, User, Eye, EyeOff, GraduationCap,
-  Sun, Moon, Sparkles, BookOpen, Trophy, Gamepad2
-} from 'lucide-react'
 
 export default function LoginPage() {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [showPassword, setShowPassword] = useState(false)
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login')
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'STUDENT', grade: 9 })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'STUDENT',
-    grade: 6,
-  })
-  const router = useRouter()
-  const { theme, toggleTheme } = useTheme()
+  const [success, setSuccess] = useState('')
+  const [showPw, setShowPw] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-
-    try {
-      if (mode === 'register') {
-        const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
-        })
-        const data = await res.json()
-        if (!res.ok) {
-          setError(data.error || 'Registration failed')
-          setLoading(false)
-          return
-        }
-      }
-
-      const result = await signIn('credentials', {
-        email: form.email,
-        password: form.password,
-        redirect: false,
-      })
-
-      if (result?.error) {
-        setError('Invalid email or password')
-        setLoading(false)
-        return
-      }
-
-      // Fetch session to know the role, then redirect appropriately
-      const sessionRes = await fetch('/api/auth/session')
-      const session = await sessionRes.json()
+  useEffect(() => {
+    if (status === 'authenticated') {
       const role = (session?.user as any)?.role
       router.push(role === 'TEACHER' ? '/teacher' : '/dashboard')
-    } catch {
-      setError('Something went wrong. Please try again.')
-      setLoading(false)
     }
+  }, [status])
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(''); setLoading(true)
+    const res = await signIn('credentials', { redirect: false, email: form.email, password: form.password })
+    setLoading(false)
+    if (res?.error) setError('Invalid email or password.')
   }
 
-  const handleGoogleLogin = () => {
-    signIn('google', { callbackUrl: '/dashboard' })
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (form.password.length < 6) return setError('Password must be at least 6 characters.')
+    setError(''); setLoading(true)
+    const res = await fetch('/api/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: form.name, email: form.email, password: form.password, role: form.role, grade: form.grade })
+    })
+    const data = await res.json()
+    setLoading(false)
+    if (!res.ok) return setError(data.error || 'Registration failed.')
+    setSuccess('Account created! You can now log in.'); setMode('login')
   }
 
-  const floatingIcons = [
-    { icon: '📐', x: '10%', y: '20%', delay: 0 },
-    { icon: '🧬', x: '85%', y: '15%', delay: 0.5 },
-    { icon: '🔬', x: '5%', y: '70%', delay: 1 },
-    { icon: '💡', x: '90%', y: '65%', delay: 1.5 },
-    { icon: '🧮', x: '15%', y: '85%', delay: 2 },
-    { icon: '⚡', x: '80%', y: '85%', delay: 0.8 },
-    { icon: '🌍', x: '50%', y: '8%', delay: 1.2 },
-    { icon: '🚀', x: '75%', y: '40%', delay: 0.3 },
-  ]
+  const fill = (role: string) => {
+    const map: any = { student: { email: 'ravi@dps.com', password: 'student123' }, teacher: { email: 'teacher@dps.com', password: 'teacher123' } }
+    if (map[role]) setForm(f => ({ ...f, ...map[role] }))
+  }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
-      style={{ background: 'var(--bg-primary)' }}
-    >
-      {/* Background Pattern */}
-      <div className="absolute inset-0 bg-pattern opacity-30" />
-
-      {/* Floating Subject Icons */}
-      {floatingIcons.map((item, i) => (
-        <motion.div
-          key={i}
-          className="absolute text-3xl md:text-4xl pointer-events-none select-none opacity-20"
-          style={{ left: item.x, top: item.y }}
-          animate={{
-            y: [0, -15, 0],
-            rotate: [0, 10, -10, 0],
-          }}
-          transition={{
-            duration: 4 + i * 0.5,
-            repeat: Infinity,
-            delay: item.delay,
-            ease: 'easeInOut',
-          }}
-        >
-          {item.icon}
-        </motion.div>
-      ))}
-
-      {/* Theme Toggle */}
-      <button
-        onClick={toggleTheme}
-        className="absolute top-4 right-4 p-3 rounded-full transition-all hover:scale-110 z-10"
-        style={{
-          background: 'var(--bg-secondary)',
-          border: '1px solid var(--border-color)',
-          color: 'var(--text-primary)',
-        }}
-      >
-        {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-      </button>
-
-      {/* Main Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="w-full max-w-md relative z-10"
-      >
-        <div
-          className="glass-card p-8 md:p-10"
-          style={{ border: '1px solid var(--border-color)' }}
-        >
-          {/* Logo & Title */}
-          <div className="text-center mb-8">
-            <motion.div
-              className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
-              style={{
-                background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))',
-                boxShadow: '0 8px 30px rgba(255, 107, 53, 0.3)',
-              }}
-              whileHover={{ scale: 1.1, rotate: 5 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <GraduationCap size={32} className="text-white" />
-            </motion.div>
-            <h1 className="text-3xl font-bold mb-1">
-              <span className="gradient-text">VidyaQuest</span>
-            </h1>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Level Up Your Learning ✨
-            </p>
-          </div>
-
-          {/* Features Strip */}
-          <div
-            className="flex items-center justify-center gap-4 mb-6 py-3 px-4 rounded-xl"
-            style={{ background: 'var(--bg-tertiary)' }}
-          >
-            <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              <Gamepad2 size={14} style={{ color: 'var(--primary)' }} />
-              <span>Play & Learn</span>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@400;600;700;800&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Nunito',sans-serif;background:#F0F4FF;color:#1E1B4B}
+        .auth-wrapper{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem;background:linear-gradient(135deg,#1e1b4b 0%,#4f46e5 45%,#7c3aed 75%,#0891b2 100%);position:relative;overflow:hidden}
+        .auth-card{background:#fff;border-radius:28px;padding:2.5rem;width:100%;max-width:440px;box-shadow:0 25px 50px rgba(0,0,0,.25);position:relative;z-index:1}
+        .auth-logo{text-align:center;margin-bottom:1.5rem}
+        .logo-icon{width:80px;height:80px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;margin:0 auto .75rem;box-shadow:0 8px 24px rgba(79,70,229,.4)}
+        h1.app-name{font-family:'Baloo 2',cursive;font-size:2rem;background:linear-gradient(135deg,#4f46e5,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .tagline{color:#6B7280;font-size:.8rem;letter-spacing:1.5px;font-weight:700;text-transform:uppercase;margin-top:.25rem}
+        .demo-box{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.82rem}
+        .demo-box h5{color:#92400e;font-size:.73rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.4rem;font-weight:800}
+        .demo-row{display:flex;align-items:center;gap:6px;padding:2px 0;color:#6B7280;flex-wrap:wrap}
+        .demo-row strong{color:#1E1B4B}
+        .fill-btn{background:none;border:none;cursor:pointer;color:#4F46E5;font-weight:700;font-size:.75rem;padding:2px 8px;border-radius:4px;margin-left:auto}
+        .fill-btn:hover{background:#EEF2FF}
+        .form-group{margin-bottom:1.1rem}
+        label{display:block;font-weight:700;margin-bottom:.4rem;font-size:.88rem}
+        input,select{width:100%;padding:11px 14px;border:2px solid #E5E7EB;border-radius:12px;font-family:'Nunito',sans-serif;font-size:1rem;color:#1E1B4B;background:#fff;outline:none;transition:border-color .2s}
+        input:focus,select:focus{border-color:#4F46E5;box-shadow:0 0 0 3px rgba(79,70,229,.15)}
+        .pw-wrap{position:relative}
+        .pw-wrap input{padding-right:44px}
+        .pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#6B7280;font-size:1.1rem;user-select:none}
+        .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'Nunito',sans-serif;font-weight:700;font-size:.95rem;padding:12px 24px;border-radius:12px;border:none;cursor:pointer;transition:all .2s;text-decoration:none;width:100%;margin-top:.5rem}
+        .btn-primary{background:#4F46E5;color:#fff;box-shadow:0 4px 0 #3730A3}
+        .btn-primary:hover{background:#3730A3;transform:translateY(-1px)}
+        .btn-success{background:#10B981;color:#fff;box-shadow:0 4px 0 #059669}
+        .btn-success:hover{background:#059669;transform:translateY(-1px)}
+        .btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+        .links{display:flex;justify-content:space-between;margin-top:1rem;font-size:.88rem}
+        .links a{color:#4F46E5;cursor:pointer;font-weight:700}
+        .links a:hover{text-decoration:underline}
+        .alert-err{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:12px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.88rem;font-weight:600}
+        .alert-ok{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0;border-radius:12px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.88rem;font-weight:600}
+        .role-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;margin-bottom:1rem}
+        .role-btn{padding:.75rem;border:2.5px solid #E5E7EB;border-radius:12px;cursor:pointer;text-align:center;font-weight:700;font-size:.85rem;background:#fff;transition:all .2s;width:100%}
+        .role-btn.active{border-color:#4F46E5;background:#EEF2FF;color:#4F46E5}
+        .feature-badges{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin-top:1.5rem;position:relative;z-index:1}
+        .fbadge{background:rgba(255,255,255,.15);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);color:#fff;padding:5px 12px;border-radius:20px;font-size:.73rem;font-weight:700}
+        .shape{position:absolute;border-radius:50%;background:rgba(255,255,255,.06);pointer-events:none}
+      `}</style>
+      <div className="auth-wrapper" id="auth-wrapper">
+        <div className="shape" style={{width:500,height:500,top:-150,right:-150}}/>
+        <div className="shape" style={{width:300,height:300,bottom:-80,left:-80}}/>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',width:'100%',maxWidth:440,position:'relative',zIndex:1}}>
+          <div className="auth-card">
+            <div className="auth-logo">
+              <div className="logo-icon">⚡</div>
+              <h1 className="app-name">VidyaQuest</h1>
+              <p className="tagline">Learn · Play · Grow</p>
             </div>
-            <div className="w-px h-4" style={{ background: 'var(--border-color)' }} />
-            <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              <Trophy size={14} style={{ color: 'var(--accent)' }} />
-              <span>Earn Rewards</span>
-            </div>
-            <div className="w-px h-4" style={{ background: 'var(--border-color)' }} />
-            <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              <BookOpen size={14} style={{ color: 'var(--secondary)' }} />
-              <span>Master STEM</span>
-            </div>
-          </div>
 
-          {/* Mode Toggle */}
-          <div
-            className="flex rounded-xl p-1 mb-6"
-            style={{ background: 'var(--bg-tertiary)' }}
-          >
-            {(['login', 'register'] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => { setMode(m); setError('') }}
-                className="flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all"
-                style={{
-                  background: mode === m ? 'var(--primary)' : 'transparent',
-                  color: mode === m ? 'white' : 'var(--text-secondary)',
-                }}
-              >
-                {m === 'login' ? 'Sign In' : 'Sign Up'}
-              </button>
-            ))}
-          </div>
+            {error && <div className="alert-err">⚠️ {error}</div>}
+            {success && <div className="alert-ok">✅ {success}</div>}
 
-          {/* Google Login */}
-          <button
-            onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl
-                       font-semibold text-sm transition-all hover:scale-[1.02] active:scale-[0.98] mb-4"
-            style={{
-              background: 'var(--bg-tertiary)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-primary)',
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Continue with Google
-          </button>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 h-px" style={{ background: 'var(--border-color)' }} />
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>or</span>
-            <div className="flex-1 h-px" style={{ background: 'var(--border-color)' }} />
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-3">
-            {mode === 'register' && (
-              <div className="relative">
-                <User
-                  size={18}
-                  className="absolute left-3 top-1/2 -translate-y-1/2"
-                  style={{ color: 'var(--text-muted)' }}
-                />
-                <input
-                  type="text"
-                  placeholder="Full Name"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                  className="w-full pl-10 pr-4 py-3 rounded-xl text-sm outline-none transition-all
-                             focus:ring-2 focus:ring-[var(--primary)]"
-                  style={{
-                    background: 'var(--bg-tertiary)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border-color)',
-                  }}
-                />
-              </div>
+            {/* LOGIN */}
+            {mode === 'login' && (
+              <form onSubmit={handleLogin}>
+                <div className="demo-box">
+                  <h5>🎯 Demo Accounts</h5>
+                  <div className="demo-row">🎒 <strong>ravi@dps.com</strong> / student123 <button type="button" className="fill-btn" onClick={() => fill('student')}>Fill ↗</button></div>
+                  <div className="demo-row">👩‍🏫 <strong>teacher@dps.com</strong> / teacher123 <button type="button" className="fill-btn" onClick={() => fill('teacher')}>Fill ↗</button></div>
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input type="email" placeholder="you@school.edu" value={form.email} onChange={e => setForm(f=>({...f,email:e.target.value}))} required />
+                </div>
+                <div className="form-group">
+                  <label>Password</label>
+                  <div className="pw-wrap">
+                    <input type={showPw?'text':'password'} placeholder="••••••••" value={form.password} onChange={e => setForm(f=>({...f,password:e.target.value}))} required />
+                    <span className="pw-toggle" onClick={() => setShowPw(p=>!p)}>{showPw?'🙈':'👁'}</span>
+                  </div>
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Logging in...' : 'Login'}</button>
+                <div className="links">
+                  <a onClick={() => { setMode('forgot'); setError(''); }}>Forgot Password?</a>
+                  <a onClick={() => { setMode('signup'); setError(''); }}>New here? <strong>Sign Up →</strong></a>
+                </div>
+              </form>
             )}
 
-            <div className="relative">
-              <Mail
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2"
-                style={{ color: 'var(--text-muted)' }}
-              />
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                required
-                className="w-full pl-10 pr-4 py-3 rounded-xl text-sm outline-none transition-all
-                           focus:ring-2 focus:ring-[var(--primary)]"
-                style={{
-                  background: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                }}
-              />
-            </div>
-
-            <div className="relative">
-              <Lock
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2"
-                style={{ color: 'var(--text-muted)' }}
-              />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                required
-                minLength={6}
-                className="w-full pl-10 pr-12 py-3 rounded-xl text-sm outline-none transition-all
-                           focus:ring-2 focus:ring-[var(--primary)]"
-                style={{
-                  background: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-
-            {mode === 'register' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <select
-                    value={form.role}
-                    onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl text-sm outline-none appearance-none cursor-pointer
-                               focus:ring-2 focus:ring-[var(--primary)]"
-                    style={{
-                      background: 'var(--bg-tertiary)',
-                      color: 'var(--text-primary)',
-                      border: '1px solid var(--border-color)',
-                    }}
-                  >
-                    <option value="STUDENT">🎓 Student</option>
-                    <option value="TEACHER">👩‍🏫 Teacher</option>
-                    <option value="ADMIN">⚙️ Admin</option>
-                  </select>
+            {/* SIGNUP */}
+            {mode === 'signup' && (
+              <form onSubmit={handleSignup}>
+                <div className="form-group">
+                  <label>I am a...</label>
+                  <div className="role-grid">
+                    {[{v:'STUDENT',l:'🎒 Student'},{v:'TEACHER',l:'👩‍🏫 Teacher'}].map(r => (
+                      <button key={r.v} type="button" className={`role-btn${form.role===r.v?' active':''}`} onClick={() => setForm(f=>({...f,role:r.v}))}>{r.l}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="form-group"><label>Full Name</label><input type="text" placeholder="Priya Sharma" value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} required /></div>
+                <div className="form-group"><label>Email</label><input type="email" placeholder="priya@school.edu" value={form.email} onChange={e => setForm(f=>({...f,email:e.target.value}))} required /></div>
+                <div className="form-group">
+                  <label>Password</label>
+                  <div className="pw-wrap">
+                    <input type={showPw?'text':'password'} placeholder="Min. 6 characters" value={form.password} onChange={e => setForm(f=>({...f,password:e.target.value}))} required minLength={6} />
+                    <span className="pw-toggle" onClick={() => setShowPw(p=>!p)}>{showPw?'🙈':'👁'}</span>
+                  </div>
                 </div>
                 {form.role === 'STUDENT' && (
-                  <div className="relative">
-                    <select
-                      value={form.grade}
-                      onChange={(e) => setForm({ ...form, grade: parseInt(e.target.value) })}
-                      className="w-full px-4 py-3 rounded-xl text-sm outline-none appearance-none cursor-pointer
-                                 focus:ring-2 focus:ring-[var(--primary)]"
-                      style={{
-                        background: 'var(--bg-tertiary)',
-                        color: 'var(--text-primary)',
-                        border: '1px solid var(--border-color)',
-                      }}
-                    >
-                      {[6, 7, 8, 9, 10, 11, 12].map((g) => (
-                        <option key={g} value={g}>
-                          Grade {g}
-                        </option>
-                      ))}
+                  <div className="form-group">
+                    <label>Class</label>
+                    <select value={form.grade} onChange={e => setForm(f=>({...f,grade:parseInt(e.target.value)}))}>
+                      {[6,7,8,9,10,11,12].map(g => <option key={g} value={g}>Class {g}</option>)}
                     </select>
                   </div>
                 )}
+                <button type="submit" className="btn btn-success" disabled={loading}>{loading ? 'Creating...' : 'Create Account 🚀'}</button>
+                <div className="links" style={{justifyContent:'center'}}>
+                  <a onClick={() => { setMode('login'); setError(''); }}>← Back to Login</a>
+                </div>
+              </form>
+            )}
+
+            {/* FORGOT */}
+            {mode === 'forgot' && (
+              <div style={{textAlign:'center'}}>
+                <div style={{fontSize:'3rem',marginBottom:'.5rem'}}>🔑</div>
+                <h3 style={{marginBottom:'.5rem',fontFamily:"'Baloo 2',cursive"}}>Forgot Password?</h3>
+                <p style={{color:'#6B7280',fontSize:'.88rem',marginBottom:'1.5rem'}}>Please contact your teacher or admin to reset your password.</p>
+                <div className="links" style={{justifyContent:'center'}}>
+                  <a onClick={() => { setMode('login'); setError(''); }}>← Back to Login</a>
+                </div>
               </div>
             )}
-
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-sm py-2.5 px-4 rounded-xl"
-                style={{
-                  background: 'rgba(239, 71, 111, 0.1)',
-                  color: 'var(--error)',
-                  border: '1px solid rgba(239, 71, 111, 0.2)',
-                }}
-              >
-                {error}
-              </motion.div>
-            )}
-
-            <motion.button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 rounded-xl font-bold text-white text-sm
-                         transition-all disabled:opacity-50"
-              style={{
-                background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))',
-                boxShadow: '0 4px 15px rgba(255, 107, 53, 0.3)',
-              }}
-              whileHover={{ scale: 1.02, boxShadow: '0 6px 25px rgba(255, 107, 53, 0.4)' }}
-              whileTap={{ scale: 0.98 }}
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="animate-spin">⏳</span>
-                  {mode === 'login' ? 'Signing in...' : 'Creating account...'}
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  <Sparkles size={16} />
-                  {mode === 'login' ? 'Start Your Quest' : 'Begin Your Journey'}
-                </span>
-              )}
-            </motion.button>
-          </form>
+          </div>
+          <div className="feature-badges">
+            <span className="fbadge">🎮 Gamified Learning</span>
+            <span className="fbadge">🏆 Leaderboards</span>
+            <span className="fbadge">📴 Offline Support</span>
+            <span className="fbadge">🌐 Hindi + English</span>
+          </div>
         </div>
-
-        {/* Footer */}
-        <p
-          className="text-center text-xs mt-4"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          Made with ❤️ for students across India
-        </p>
-      </motion.div>
-    </div>
+      </div>
+    </>
   )
 }
