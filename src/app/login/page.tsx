@@ -57,7 +57,11 @@ export default function LoginPage() {
         return
       }
 
-      router.push('/dashboard')
+      // Fetch session to know the role, then redirect appropriately
+      const sessionRes = await fetch('/api/auth/session')
+      const session = await sessionRes.json()
+      const role = (session?.user as any)?.role
+      router.push(role === 'TEACHER' ? '/teacher' : '/dashboard')
     } catch {
       setError('Something went wrong. Please try again.')
       setLoading(false)

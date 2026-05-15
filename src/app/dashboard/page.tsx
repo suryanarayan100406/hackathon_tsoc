@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { XPBar } from '@/components/ui/XPBar'
 import { BadgeShelf } from '@/components/ui/BadgeShelf'
 import { StreakFlame } from '@/components/ui/StreakFlame'
 import {
-  LogOut, BookOpen, Trophy, Star, Zap,
-  Map, User, ChevronRight, Lock
+  LogOut, Trophy, Zap,
+  Map, ChevronRight, Lock, LayoutGrid, Medal, Flame
 } from 'lucide-react'
 
 interface Quest {
@@ -58,6 +58,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeSubject, setActiveSubject] = useState(0)
+  const [activeTab, setActiveTab] = useState<'quests' | 'leaderboard' | 'profile'>('quests')
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const [lbLoading, setLbLoading] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -76,6 +79,15 @@ export default function DashboardPage() {
       .catch(() => setError('Failed to load dashboard'))
       .finally(() => setLoading(false))
   }, [status])
+
+  const fetchLeaderboard = () => {
+    if (leaderboard.length > 0) return
+    setLbLoading(true)
+    fetch('/api/student/leaderboard')
+      .then(r => r.json())
+      .then(d => setLeaderboard(d.leaderboard || []))
+      .finally(() => setLbLoading(false))
+  }
 
   if (status === 'loading' || loading) {
     return (
@@ -157,7 +169,29 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      {/* Bottom Nav */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-safe"
+        style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)' }}>
+        <div className="max-w-2xl mx-auto flex">
+          {[
+            { tab: 'quests', icon: <LayoutGrid size={20} />, label: 'Quests' },
+            { tab: 'leaderboard', icon: <Medal size={20} />, label: 'Ranks', onClick: fetchLeaderboard },
+            { tab: 'profile', icon: <Flame size={20} />, label: 'Profile' },
+          ].map(({ tab, icon, label, onClick }: any) => (
+            <button key={tab} onClick={() => { setActiveTab(tab); onClick?.() }}
+              className="flex-1 flex flex-col items-center gap-1 py-3 text-xs font-semibold transition-colors"
+              style={{ color: activeTab === tab ? 'var(--primary)' : 'var(--text-muted)' }}>
+              {icon}
+              {label}
+              {activeTab === tab && (
+                <motion.div layoutId="nav-indicator" className="w-1 h-1 rounded-full" style={{ background: 'var(--primary)' }} />
+              )}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      <div className="max-w-2xl mx-auto px-4 py-6 pb-24 space-y-6">
 
         {/* Welcome + XP */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -194,7 +228,7 @@ export default function DashboardPage() {
         </motion.div>
 
         {/* Badges */}
-        {badges.length > 0 && (
+        {activeTab === 'quests' && badges.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
             className="glass-card p-5 rounded-2xl"
             style={{ border: '1px solid var(--border-color)' }}>
@@ -209,7 +243,7 @@ export default function DashboardPage() {
         )}
 
         {/* Quest Map */}
-        {subjects && subjects.length > 0 && (
+        {activeTab === 'quests' && subjects && subjects.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             {/* Subject Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-4">
@@ -303,13 +337,93 @@ export default function DashboardPage() {
         )}
 
         {/* Empty state */}
-        {(!subjects || subjects.length === 0) && (
+        {activeTab === 'quests' && (!subjects || subjects.length === 0) && (
           <div className="text-center py-16">
             <p className="text-5xl mb-4">🗺️</p>
             <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>No quests available yet</p>
             <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Check back soon!</p>
           </div>
         )}
+
+        {/* ── LEADERBOARD TAB ── */}
+        {activeTab === 'leaderboard' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+            <h2 className="font-bold" style={{ color: 'var(--text-secondary)' }}>🏆 Top Students</h2>
+            {lbLoading ? (
+              <div className="text-center py-12" style={{ color: 'var(--text-muted)' }}>Loading...</div>
+            ) : leaderboard.map((entry) => (
+              <motion.div key={entry.id}
+                initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                className="glass-card p-4 rounded-2xl flex items-center gap-3"
+                style={{
+                  border: entry.isMe ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                  background: entry.isMe ? 'rgba(255,107,53,0.05)' : undefined,
+                }}>
+                {/* Rank */}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg flex-shrink-0"
+                  style={{
+                    background: entry.rank === 1 ? '#ffd700' : entry.rank === 2 ? '#c0c0c0' : entry.rank === 3 ? '#cd7f32' : 'var(--bg-tertiary)',
+                    color: entry.rank <= 3 ? '#000' : 'var(--text-muted)',
+                  }}>
+                  {entry.rank <= 3 ? ['🥇','🥈','🥉'][entry.rank-1] : entry.rank}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm" style={{ color: entry.isMe ? 'var(--primary)' : 'var(--text-primary)' }}>
+                    {entry.name} {entry.isMe ? '(You)' : ''}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Grade {entry.grade} · {entry.questsDone} quests</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{entry.xp} XP</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Lv.{entry.level}</p>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+
+        {/* ── PROFILE TAB ── */}
+        {activeTab === 'profile' && data && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+            <div className="glass-card p-6 rounded-2xl text-center" style={{ border: '1px solid var(--border-color)' }}>
+              <div className="w-20 h-20 rounded-full mx-auto mb-3 flex items-center justify-center text-4xl"
+                style={{ background: 'linear-gradient(135deg, var(--primary), var(--accent))' }}>🎓</div>
+              <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{data.user.name}</h2>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Grade {data.user.grade} Student</p>
+              <div className="mt-4">
+                <XPBar xp={data.user.xp} size="lg" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Day Streak', value: `${data.user.streakDays} 🔥`, color: '#ff6b35' },
+                { label: 'Level', value: `Lv.${data.user.level}`, color: 'var(--accent)' },
+                { label: 'Total XP', value: `${data.user.xp} ⚡`, color: 'var(--primary)' },
+                { label: 'Badges', value: `${badges.length} 🏅`, color: '#ffd166' },
+              ].map(item => (
+                <div key={item.label} className="glass-card p-4 rounded-2xl text-center" style={{ border: '1px solid var(--border-color)' }}>
+                  <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
+                  <p className="text-xl font-bold" style={{ color: item.color }}>{item.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {badges.length > 0 && (
+              <div className="glass-card p-5 rounded-2xl" style={{ border: '1px solid var(--border-color)' }}>
+                <p className="font-bold text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>🏅 My Badges</p>
+                <BadgeShelf badges={badges} maxDisplay={12} />
+              </div>
+            )}
+
+            <button onClick={() => signOut({ callbackUrl: '/login' })}
+              className="w-full py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2"
+              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+              <LogOut size={16} /> Sign Out
+            </button>
+          </motion.div>
+        )}
+
       </div>
     </div>
   )
