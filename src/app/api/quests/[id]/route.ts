@@ -4,18 +4,17 @@ import { auth } from '@/lib/auth'
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const questId = params.id
-
     const quest = await prisma.quest.findUnique({
-      where: { id: questId },
+      where: { id },
       include: {
         unit: {
           select: {

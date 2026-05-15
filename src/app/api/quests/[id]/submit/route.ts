@@ -5,16 +5,16 @@ import { calculateStars, getLevelInfo, BADGE_DEFINITIONS } from '@/lib/gamificat
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await auth()
     if (!session?.user || (session.user as any).role !== 'STUDENT') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
-    const questId = params.id
     const body = await req.json()
     // score = number of correct answers, totalQuestions = total
     const { score: rawScore, totalQuestions, timeSpent } = body
@@ -24,7 +24,7 @@ export async function POST(
 
     // 1. Fetch Quest
     const quest = await prisma.quest.findUnique({
-      where: { id: questId },
+      where: { id },
       include: { unit: { include: { subject: true } } }
     })
     if (!quest) return NextResponse.json({ error: 'Quest not found' }, { status: 404 })
@@ -47,18 +47,18 @@ export async function POST(
 
     // 4. Upsert progress — only improve score, never decrease
     const existing = await prisma.questProgress.findUnique({
-      where: { userId_questId: { userId, questId } }
+      where: { userId_questId: { userId, questId: id } }
     })
 
     await prisma.questProgress.upsert({
-      where: { userId_questId: { userId, questId } },
+      where: { userId_questId: { userId, questId: id } },
       update: {
         score: Math.max(correct, existing?.score ?? 0),
         stars: Math.max(stars, existing?.stars ?? 0),
         xpEarned: xpEarned,
         completedAt: new Date(),
       },
-      create: { userId, questId, score: correct, stars, xpEarned }
+      create: { userId, questId: id, score: correct, stars, xpEarned }
     })
 
     // 5. Update User XP, level, streak
