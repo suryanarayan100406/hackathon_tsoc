@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       include: {
         units: {
           orderBy: { order: 'asc' },
-          // Show all units (not filtered by grade) so quests are always visible
+          where: { grade: user.grade },
           include: {
             quests: {
               orderBy: { order: 'asc' },
