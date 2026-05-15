@@ -41,14 +41,16 @@ export async function GET(
     }
 
     return NextResponse.json({
-      id: quest.id,
-      title: quest.title,
-      type: quest.type,
-      difficulty: quest.difficulty,
-      xpReward: quest.xpReward,
-      timeLimit: quest.timeLimit,
-      content,
-      unit: quest.unit
+      quest: {
+        id: quest.id,
+        title: quest.title,
+        type: quest.type,
+        difficulty: quest.difficulty,
+        xpReward: quest.xpReward,
+        timeLimit: quest.timeLimit,
+        content,
+        unit: quest.unit,
+      }
     })
   } catch (error) {
     console.error('Quest fetch error:', error)

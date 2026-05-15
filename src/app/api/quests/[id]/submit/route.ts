@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { auth } from '@/lib/auth'
-import { calculateLevel, calculateStars, BADGE_DEFINITIONS } from '@/lib/gamification'
+import { calculateStars, getLevelInfo, BADGE_DEFINITIONS } from '@/lib/gamification'
 
 export async function POST(
   req: NextRequest,
@@ -16,137 +16,131 @@ export async function POST(
     const userId = (session.user as any).id
     const questId = params.id
     const body = await req.json()
-    const { score } = body
+    // score = number of correct answers, totalQuestions = total
+    const { score: rawScore, totalQuestions, timeSpent } = body
 
-    if (score === undefined || score < 0 || score > 100) {
-      return NextResponse.json({ error: 'Invalid score. Must be between 0 and 100' }, { status: 400 })
-    }
+    const total = totalQuestions ?? 1
+    const correct = rawScore ?? 0
 
-    // 1. Fetch Quest to get base XP and unit details
+    // 1. Fetch Quest
     const quest = await prisma.quest.findUnique({
       where: { id: questId },
-      include: { unit: true }
+      include: { unit: { include: { subject: true } } }
     })
+    if (!quest) return NextResponse.json({ error: 'Quest not found' }, { status: 404 })
 
-    if (!quest) {
-      return NextResponse.json({ error: 'Quest not found' }, { status: 404 })
-    }
-
-    // 2. Fetch User to get current XP and Level
+    // 2. Fetch User
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { badges: true, progress: true }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // 3. Calculate Gamification Rewards
-    // Stars based on score (e.g. 90+ = 3 stars, 70+ = 2 stars, 50+ = 1 star)
-    const starsEarned = calculateStars(score)
-    
-    // XP calculation: Base XP * Score multiplier
-    // Score 100 = 100% XP. Minimum XP is 10 for trying.
-    const xpEarned = Math.max(10, Math.round(quest.xpReward * (score / 100)))
-
-    // 4. Update or Create Quest Progress
-    const progress = await prisma.questProgress.upsert({
-      where: {
-        userId_questId: {
-          userId,
-          questId,
-        }
-      },
-      update: {
-        score: Math.max(score, 0), // Assuming we keep the latest or highest? Let's just update for now. 
-        // In a real app, you might want to only update if score is higher: 
-        // score: { set: Math.max(score, previousScore) }
-        stars: Math.max(starsEarned, 0),
-        xpEarned: { increment: xpEarned },
-        completedAt: new Date(),
-      },
-      create: {
-        userId,
-        questId,
-        score,
-        stars: starsEarned,
-        xpEarned,
+      include: {
+        badges: { include: { badge: true } },
+        progress: { include: { quest: { include: { unit: { include: { subject: true } } } } } }
       }
     })
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-    // 5. Update User XP and Level
-    const newTotalXp = user.xp + xpEarned
-    const newLevel = calculateLevel(newTotalXp)
-    const levelUp = newLevel > user.level
+    // 3. Calculate stars and XP
+    const stars = calculateStars(correct, total)
+    const streakMultiplier = user.streakDays >= 7 ? 1.5 : user.streakDays >= 3 ? 1.25 : 1
+    const baseXP = Math.round(quest.xpReward * (correct / total))
+    const xpEarned = Math.max(10, Math.round(baseXP * (1 + stars * 0.25) * streakMultiplier))
 
-    // Update Streak Logic (Basic implementation)
-    const lastActive = new Date(user.lastActive)
-    const today = new Date()
-    const diffDays = Math.floor((today.getTime() - lastActive.getTime()) / (1000 * 3600 * 24))
-    
-    let newStreak = user.streakDays
-    if (diffDays === 1) {
-      newStreak += 1
-    } else if (diffDays > 1) {
-      newStreak = 1 // Reset streak if missed a day
-    }
+    // 4. Upsert progress — only improve score, never decrease
+    const existing = await prisma.questProgress.findUnique({
+      where: { userId_questId: { userId, questId } }
+    })
 
-    // 6. Check for New Badges
-    const newlyUnlockedBadges: any[] = []
-    
-    // Evaluate triggers
+    await prisma.questProgress.upsert({
+      where: { userId_questId: { userId, questId } },
+      update: {
+        score: Math.max(correct, existing?.score ?? 0),
+        stars: Math.max(stars, existing?.stars ?? 0),
+        xpEarned: xpEarned,
+        completedAt: new Date(),
+      },
+      create: { userId, questId, score: correct, stars, xpEarned }
+    })
+
+    // 5. Update User XP, level, streak
+    const newXP = user.xp + (existing ? 0 : xpEarned) // Only grant XP on first completion
+    const { current: currentLevel } = getLevelInfo(user.xp)
+    const { current: newLevelInfo } = getLevelInfo(newXP)
+    const leveledUp = newLevelInfo.level > currentLevel.level
+
+    const lastActive = user.lastActive ? new Date(user.lastActive) : null
+    const now = new Date()
+    const diffDays = lastActive
+      ? Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 3600 * 24))
+      : 999
+    const newStreak = diffDays === 1 ? user.streakDays + 1 : diffDays === 0 ? user.streakDays : 1
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { xp: newXP, level: newLevelInfo.level, streakDays: newStreak, lastActive: now }
+    })
+
+    // 6. Badge unlocking
+    const newBadges: any[] = []
+    const allBadgesInDB = await prisma.badge.findMany()
+    const userBadgeTriggers = user.badges.map(ub => ub.badge.trigger)
+
+    const allProgress = [
+      ...user.progress,
+      ...(existing ? [] : [{ quest }]) // include this quest if first time
+    ]
+    const subjectSlugsCompleted = new Set(
+      allProgress.map((p: any) => p.quest?.unit?.subject?.slug).filter(Boolean)
+    )
+    const mathPerfect = allProgress.filter((p: any) =>
+      p.quest?.unit?.subject?.slug === 'mathematics' && (p.score ?? 0) >= (p.quest?.content ? JSON.parse(p.quest.content as string)?.questions?.length : 1)
+    ).length
+
     for (const badgeDef of BADGE_DEFINITIONS) {
-      const alreadyHasBadge = user.badges.some(ub => ub.badgeId === badgeDef.id)
-      if (alreadyHasBadge) continue
+      if (userBadgeTriggers.includes(badgeDef.trigger)) continue
 
       let unlocked = false
-      if (badgeDef.trigger === 'FIRST_QUEST') {
-        unlocked = user.progress.length === 0 // This is the first quest they just completed
-      } else if (badgeDef.trigger === 'PERFECT_SCORE' && score === 100) {
-        unlocked = true
-      } else if (badgeDef.trigger === 'STREAK_3' && newStreak >= 3) {
-        unlocked = true
-      } else if (badgeDef.trigger === 'LEVEL_5' && newLevel >= 5) {
-        unlocked = true
-      } else if (badgeDef.trigger === 'ALL_SUBJECTS') {
-         // simplified check
-         unlocked = user.progress.length > 5
+      switch (badgeDef.trigger) {
+        case 'FIRST_QUEST':
+          unlocked = user.progress.length === 0 && !existing
+          break
+        case 'LEVEL_2': unlocked = newLevelInfo.level >= 2; break
+        case 'LEVEL_4': unlocked = newLevelInfo.level >= 4; break
+        case 'STREAK_5': unlocked = newStreak >= 5; break
+        case 'STREAK_7': unlocked = newStreak >= 7; break
+        case 'STREAK_30': unlocked = newStreak >= 30; break
+        case 'MATH_PERFECT_3': unlocked = mathPerfect >= 3; break
+        case 'ALL_SUBJECTS': unlocked = subjectSlugsCompleted.size >= 5; break
+        case 'STARS_10':
+          unlocked = allProgress.reduce((sum: number, p: any) => sum + (p.stars ?? 0), 0) + stars >= 10
+          break
+        case 'DAILY_5':
+          unlocked = allProgress.filter((p: any) => {
+            const d = p.completedAt ? new Date(p.completedAt) : null
+            return d && d.toDateString() === now.toDateString()
+          }).length >= 4 // current quest is the 5th
+          break
+        case 'XP_10000': unlocked = newXP >= 10000; break
+        case 'SPEED_60': unlocked = !!timeSpent && timeSpent <= 60; break
+        case 'JOIN_SCHOOL': unlocked = !!user.schoolId; break
       }
 
       if (unlocked) {
-        newlyUnlockedBadges.push(badgeDef)
-        await prisma.userBadge.create({
-          data: {
-            userId,
-            badgeId: badgeDef.id
-          }
-        })
+        const badgeInDB = allBadgesInDB.find(b => b.trigger === badgeDef.trigger)
+        if (badgeInDB) {
+          await prisma.userBadge.create({ data: { userId, badgeId: badgeInDB.id } })
+          newBadges.push({ badge: badgeInDB })
+        }
       }
     }
 
-    // 7. Save User Updates
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        xp: newTotalXp,
-        level: newLevel,
-        streakDays: newStreak,
-        lastActive: new Date(),
-      }
-    })
-
     return NextResponse.json({
       success: true,
-      xpEarned,
-      starsEarned,
-      levelUp,
-      newLevel,
-      badgesUnlocked: newlyUnlockedBadges.map(b => ({
-        id: b.id,
-        name: b.name,
-        icon: b.icon
-      }))
+      score: correct,
+      stars,
+      xpEarned: existing ? 0 : xpEarned, // show 0 XP on retry
+      leveledUp,
+      streakMultiplier,
+      badges: newBadges,
     })
 
   } catch (error) {
