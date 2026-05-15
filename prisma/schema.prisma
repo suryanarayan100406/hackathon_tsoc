@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          String    @default("STUDENT")
+  grade         Int       @default(6)
+  language      String    @default("en")
+  schoolId      String?
+  school        School?   @relation(fields: [schoolId], references: [id])
+  xp            Int       @default(0)
+  level         Int       @default(1)
+  streakDays    Int       @default(0)
+  lastActive    DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  badges        UserBadge[]
+  progress      QuestProgress[]
+  notifications Notification[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model School {
+  id       String @id @default(cuid())
+  name     String
+  code     String @unique
+  district String
+  state    String
+  users    User[]
+}
+
+model Subject {
+  id    String @id @default(cuid())
+  name  String
+  slug  String @unique
+  icon  String
+  color String
+  order Int    @default(0)
+  units Unit[]
+}
+
+model Unit {
+  id        String  @id @default(cuid())
+  name      String
+  grade     Int
+  order     Int     @default(0)
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  quests    Quest[]
+}
+
+model Quest {
+  id         String @id @default(cuid())
+  title      String
+  type       String @default("QUIZ")
+  difficulty String @default("EASY")
+  xpReward   Int    @default(50)
+  timeLimit  Int    @default(300)
+  unitId     String
+  unit       Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  content    String @default("{}") // JSON string — multilingual question bank
+  order      Int    @default(0)
+  createdBy  String? // teacher ID if custom
+  progress   QuestProgress[]
+}
+
+model QuestProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questId     String
+  quest       Quest     @relation(fields: [questId], references: [id], onDelete: Cascade)
+  score       Int
+  stars       Int       @default(0)
+  xpEarned    Int
+  completedAt DateTime  @default(now())
+  syncedAt    DateTime?
+
+  @@unique([userId, questId])
+}
+
+model Badge {
+  id          String      @id @default(cuid())
+  name        String
+  description String
+  icon        String
+  trigger     String
+  users       UserBadge[]
+}
+
+model UserBadge {
+  userId   String
+  badgeId  String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge    Badge  @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt DateTime @default(now())
+
+  @@id([userId, badgeId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  type      String   @default("INFO")
+  createdAt DateTime @default(now())
+}
