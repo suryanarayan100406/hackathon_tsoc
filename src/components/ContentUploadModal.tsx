@@ -11,12 +11,15 @@ interface ContentUploadModalProps {
 
 export default function ContentUploadModal({ isOpen, onClose, subjects, grade, onSuccess }: ContentUploadModalProps) {
   const [title, setTitle] = useState('')
+  const [titleHi, setTitleHi] = useState('')
   const [description, setDescription] = useState('')
+  const [descriptionHi, setDescriptionHi] = useState('')
   const [type, setType] = useState('PDF')
   const [subjectSlug, setSubjectSlug] = useState('')
   const [unitId, setUnitId] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [fileUrl, setFileUrl] = useState('')
+  const [language, setLanguage] = useState('en')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -50,8 +53,11 @@ export default function ContentUploadModal({ isOpen, onClose, subjects, grade, o
       const formData = new FormData()
       formData.append('title', title)
       formData.append('description', description)
+      formData.append('titleJson', JSON.stringify({ en: title, hi: titleHi }))
+      formData.append('descJson', JSON.stringify({ en: description, hi: descriptionHi }))
       formData.append('type', type)
       formData.append('unitId', unitId)
+      formData.append('language', language)
 
       if (file) {
         formData.append('file', file)
@@ -70,18 +76,22 @@ export default function ContentUploadModal({ isOpen, onClose, subjects, grade, o
         throw new Error(data.error || 'Failed to upload')
       }
 
-      setMessage({ type: 'success', text: 'Content uploaded successfully!' })
+      setMessage({ type: 'success', text: 'Content uploaded successfully! Refreshing...' })
       setTimeout(() => {
         setTitle('')
+        setTitleHi('')
         setDescription('')
+        setDescriptionHi('')
         setType('PDF')
         setSubjectSlug('')
         setUnitId('')
         setFile(null)
         setFileUrl('')
+        setLanguage('en')
+        setMessage({ type: '', text: '' })
         onClose()
         onSuccess()
-      }, 1500)
+      }, 1000)
     } catch (err) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Error uploading content' })
     } finally {
@@ -125,6 +135,30 @@ export default function ContentUploadModal({ isOpen, onClose, subjects, grade, o
               placeholder="Brief description of the content..."
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
             />
+          </div>
+
+          {/* Multilingual Support */}
+          <div className="border-t pt-4 mt-4">
+            <label className="block text-sm font-semibold mb-3">🌐 Hindi Translation (Optional)</label>
+            <div>
+              <label className="block text-sm font-semibold mb-1">Title in Hindi</label>
+              <input
+                type="text"
+                value={titleHi}
+                onChange={(e) => setTitleHi(e.target.value)}
+                placeholder="हिंदी में शीर्षक"
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-1">Description in Hindi</label>
+              <textarea
+                value={descriptionHi}
+                onChange={(e) => setDescriptionHi(e.target.value)}
+                placeholder="हिंदी में विवरण..."
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

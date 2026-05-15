@@ -18,7 +18,8 @@ export default function TeacherPage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState({ type: '', text: '' })
   const [questions, setQuestions] = useState([emptyQ()])
-  const [form, setForm] = useState({ subjectSlug: '', unitName: '', title: '', type: 'QUIZ', difficulty: 'EASY', xpReward: 50, timeLimit: 300 })
+  const [form, setForm] = useState({ subjectSlug: '', unitName: '', title: '', type: 'QUIZ', difficulty: 'EASY', xpReward: 50, timeLimit: 300, passMark: 70 })
+  const [editingQuestId, setEditingQuestId] = useState<string | null>(null)
   const [subjForm, setSubjForm] = useState({ name: '', icon: '📚', color: '#4f46e5' })
   const [showContentModal, setShowContentModal] = useState(false)
   const [contentForm, setContentForm] = useState({ title: '', description: '', unitId: '' })
@@ -36,6 +37,9 @@ export default function TeacherPage() {
     if (status !== 'authenticated') return
     setLoading(true)
     fetch(`/api/teacher/quests?grade=${grade}`).then(r => r.json()).then(d => setSubjects(d.subjects || [])).finally(() => setLoading(false))
+    // Also load content
+    setContentLoading(true)
+    fetch(`/api/teacher/content?grade=${grade}`).then(r => r.json()).then(d => setContent(d.content || [])).finally(() => setContentLoading(false))
   }, [grade, status])
 
   useEffect(() => {
@@ -50,14 +54,38 @@ export default function TeacherPage() {
   const totalQuests = subjects.reduce((n, s) => n + s.units.reduce((m: number, u: any) => m + u.quests.length, 0), 0)
   const name = (session?.user as any)?.name || 'Teacher'
 
+  async function loadQuestForEdit(questId: string) {
+    try {
+      const res = await fetch(`/api/quests/${questId}`)
+      if (!res.ok) return setMsg({ type: 'err', text: 'Failed to load quest.' })
+      const d = await res.json()
+      const quest = d.quest
+      setForm({
+        subjectSlug: quest.subject?.toLowerCase().replace(/\s+/g, '_') || '',
+        unitName: quest.unit || '',
+        title: quest.title,
+        type: quest.type,
+        difficulty: quest.difficulty,
+        xpReward: quest.xpReward,
+        timeLimit: quest.timeLimit,
+        passMark: quest.passMark
+      })
+      setQuestions(quest.content?.questions || [emptyQ()])
+      setEditingQuestId(questId)
+      setShowQuestModal(true)
+    } catch (err) {
+      setMsg({ type: 'err', text: 'Error loading quest.' })
+    }
+  }
+
   async function saveQuest() {
     if (!form.title || !form.subjectSlug) return setMsg({ type: 'err', text: 'Title and subject required.' })
     setSaving(true)
-    const res = await fetch('/api/teacher/quests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, grade, questions }) })
+    const res = await fetch('/api/teacher/quests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, grade, questions, questId: editingQuestId || undefined }) })
     const d = await res.json(); setSaving(false)
     if (!res.ok) return setMsg({ type: 'err', text: d.error || 'Failed.' })
-    setMsg({ type: 'ok', text: `Quest "${d.quest?.title}" published!` })
-    setShowQuestModal(false); setForm({ subjectSlug: '', unitName: '', title: '', type: 'QUIZ', difficulty: 'EASY', xpReward: 50, timeLimit: 300 }); setQuestions([emptyQ()])
+    setMsg({ type: 'ok', text: `Quest "${d.quest?.title}" ${editingQuestId ? 'updated' : 'published'}!` })
+    setShowQuestModal(false); setForm({ subjectSlug: '', unitName: '', title: '', type: 'QUIZ', difficulty: 'EASY', xpReward: 50, timeLimit: 300, passMark: 70 }); setQuestions([emptyQ()]); setEditingQuestId(null)
     fetch(`/api/teacher/quests?grade=${grade}`).then(r => r.json()).then(d => setSubjects(d.subjects || []))
   }
 
@@ -69,6 +97,22 @@ export default function TeacherPage() {
     if (!res.ok) return setMsg({ type: 'err', text: d.error || 'Failed.' })
     setMsg({ type: 'ok', text: `Subject "${d.subject?.name}" created!` })
     setShowSubjModal(false); setSubjForm({ name: '', icon: '📚', color: '#4f46e5' })
+    fetch(`/api/teacher/quests?grade=${grade}`).then(r => r.json()).then(d => setSubjects(d.subjects || []))
+  }
+
+  async function saveContent() {
+    if (!contentFile || !contentForm.title || !contentForm.unitId) return setMsg({ type: 'err', text: 'File, title, and unit required.' })
+    setSaving(true)
+    const formData = new FormData()
+    formData.append('file', contentFile)
+    formData.append('title', contentForm.title)
+    formData.append('description', contentForm.description)
+    formData.append('unitId', contentForm.unitId)
+    const res = await fetch('/api/teacher/content', { method: 'POST', body: formData })
+    const d = await res.json(); setSaving(false)
+    if (!res.ok) return setMsg({ type: 'err', text: d.error || 'Failed.' })
+    setMsg({ type: 'ok', text: `Content "${d.content?.title}" uploaded!` })
+    setShowContentModal(false); setContentForm({ title: '', description: '', unitId: '' }); setContentFile(null)
     fetch(`/api/teacher/quests?grade=${grade}`).then(r => r.json()).then(d => setSubjects(d.subjects || []))
   }
 
@@ -169,7 +213,7 @@ export default function TeacherPage() {
               <div className="card stat-card yellow"><div style={{fontSize:'2rem',marginBottom:'.5rem'}}>🎯</div><div style={{fontSize:'2rem',fontWeight:900}}>Grade {grade}</div><div style={{color:'#6b7280',fontSize:'.85rem',fontWeight:600}}>Current Grade</div></div>
               <div className="card stat-card red"><div style={{fontSize:'2rem',marginBottom:'.5rem'}}>🏆</div><div style={{fontSize:'2rem',fontWeight:900}}>{subjects.reduce((n,s)=>n+s.units.length,0)}</div><div style={{color:'#6b7280',fontSize:'.85rem',fontWeight:600}}>Units</div></div>
             </div>
-            <QuestList subjects={subjects} loading={loading} grade={grade} expandedSubject={expandedSubject} setExpandedSubject={setExpandedSubject} onAdd={() => { setMsg({type:'',text:''}); setShowQuestModal(true) }} />
+            <QuestList subjects={subjects} loading={loading} grade={grade} expandedSubject={expandedSubject} setExpandedSubject={setExpandedSubject} onAdd={() => { setMsg({type:'',text:''}); setEditingQuestId(null); setForm({ subjectSlug: '', unitName: '', title: '', type: 'QUIZ', difficulty: 'EASY', xpReward: 50, timeLimit: 300, passMark: 70 }); setQuestions([emptyQ()]); setShowQuestModal(true) }} onEdit={loadQuestForEdit} />
           </>
         )}
 
@@ -195,13 +239,13 @@ export default function TeacherPage() {
         )}
       </main>
 
-      {/* ADD QUEST MODAL */}
+      {/* ADD/EDIT QUEST MODAL */}
       {showQuestModal && (
         <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setShowQuestModal(false)}>
           <div className="modal">
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.5rem'}}>
-              <h2 style={{fontWeight:900}}>➕ Add New Quest</h2>
-              <button style={{background:'none',border:'none',fontSize:'1.5rem',cursor:'pointer',color:'#6b7280'}} onClick={()=>setShowQuestModal(false)}>✕</button>
+              <h2 style={{fontWeight:900}}>{editingQuestId ? '✏️ Edit Quest' : '➕ Add New Quest'}</h2>
+              <button style={{background:'none',border:'none',fontSize:'1.5rem',cursor:'pointer',color:'#6b7280'}} onClick={()=>{setShowQuestModal(false);setEditingQuestId(null)}}>✕</button>
             </div>
             {msg.text && <div className={msg.type==='ok'?'alert-ok':'alert-err'}>{msg.text}</div>}
             <div className="fgrid">
@@ -213,19 +257,25 @@ export default function TeacherPage() {
               </div>
               <div><label>Unit Name</label><input placeholder="e.g. Algebra Basics" value={form.unitName} onChange={e=>setForm(f=>({...f,unitName:e.target.value}))} /></div>
               <div style={{gridColumn:'1/-1'}}><label>Quest Title</label><input placeholder="e.g. Intro to Fractions" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} /></div>
-              <div><label>Type</label>
+              
+              <div><label>🎮 Quest Type</label>
                 <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>
-                  <option value="QUIZ">📝 Quiz (MCQ)</option>
-                  <option value="MATCH_PAIRS">🃏 Match Pairs</option>
+                  <option value="LESSON">📚 Lesson</option>
+                  <option value="QUIZ">📝 Quiz / MCQ</option>
+                  <option value="BOSS">🏆 Boss Battle</option>
                 </select>
               </div>
-              <div><label>Difficulty</label>
+              <div><label>🎯 Difficulty</label>
                 <select value={form.difficulty} onChange={e=>setForm(f=>({...f,difficulty:e.target.value}))}>
-                  <option value="EASY">Easy</option><option value="MEDIUM">Medium</option><option value="HARD">Hard</option>
+                  <option value="EASY">⭐ Easy</option>
+                  <option value="MEDIUM">⭐⭐ Medium</option>
+                  <option value="HARD">⭐⭐⭐ Hard</option>
                 </select>
               </div>
-              <div><label>XP Reward</label><input type="number" value={form.xpReward} onChange={e=>setForm(f=>({...f,xpReward:+e.target.value||50}))} /></div>
-              <div><label>Time Limit (sec)</label><input type="number" value={form.timeLimit} onChange={e=>setForm(f=>({...f,timeLimit:+e.target.value||300}))} /></div>
+              
+              <div><label>⚡ XP Reward</label><input type="number" min="0" max="500" value={form.xpReward} onChange={e=>setForm(f=>({...f,xpReward:Math.max(0,+e.target.value||50)}))} style={{fontWeight:700}} /></div>
+              <div><label>✅ Pass Mark (%)</label><input type="number" min="0" max="100" value={form.passMark} onChange={e=>setForm(f=>({...f,passMark:Math.max(0,Math.min(100,+e.target.value||70))}))} style={{fontWeight:700}} /></div>
+              <div><label>⏱️ Time Limit (sec)</label><input type="number" min="30" max="3600" value={form.timeLimit} onChange={e=>setForm(f=>({...f,timeLimit:+e.target.value||300}))} /></div>
             </div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'1rem 0 .75rem'}}>
               <label style={{margin:0}}>Questions ({questions.length})</label>
@@ -247,7 +297,7 @@ export default function TeacherPage() {
                 <input placeholder="Explanation (optional)" value={q.explanation} onChange={e=>{const qs=[...questions];qs[qi].explanation=e.target.value;setQuestions(qs)}} style={{marginTop:'.4rem',fontSize:'.85rem'}} />
               </div>
             ))}
-            <button className="btn btn-success" disabled={saving} onClick={saveQuest} style={{width:'100%',marginTop:'.5rem'}}>{saving?'⏳ Publishing...':'✅ Publish Quest'}</button>
+            <button className="btn btn-success" disabled={saving} onClick={saveQuest} style={{width:'100%',marginTop:'.5rem'}}>{saving?'⏳ Saving...':editingQuestId?'✅ Update Quest':'✅ Publish Quest'}</button>
           </div>
         </div>
       )}
@@ -281,7 +331,7 @@ export default function TeacherPage() {
   )
 }
 
-function QuestList({ subjects, loading, grade, expandedSubject, setExpandedSubject, onAdd }: any) {
+function QuestList({ subjects, loading, grade, expandedSubject, setExpandedSubject, onAdd, onEdit }: any) {
   if (loading) return <div style={{textAlign:'center',padding:'3rem',color:'#6b7280'}}><div style={{width:40,height:40,border:'4px solid #e0e7ff',borderTopColor:'#4f46e5',borderRadius:'50%',animation:'spin 1s linear infinite',margin:'0 auto 1rem'}}/>Loading...</div>
   const active = subjects.filter((s: any) => s.units.some((u: any) => u.quests.length > 0))
   if (!active.length) return (
@@ -309,10 +359,12 @@ function QuestList({ subjects, loading, grade, expandedSubject, setExpandedSubje
               <div className="unit-lbl">📂 {unit.name}</div>
               {unit.quests.map((q:any)=>(
                 <div key={q.id} className="quest-row">
-                  <span style={{fontWeight:600,fontSize:'.92rem'}}>{q.type==='QUIZ'?'📝':q.type==='MATCH_PAIRS'?'🃏':'🎯'} {q.title}</span>
-                  <div style={{display:'flex',gap:'.4rem'}}>
+                  <span style={{fontWeight:600,fontSize:'.92rem'}}>{q.type==='QUIZ'?'📝':q.type==='LESSON'?'📚':q.type==='BOSS'?'🏆':'🎯'} {q.title}</span>
+                  <div style={{display:'flex',gap:'.4rem',alignItems:'center'}}>
                     <span className={`badge ${q.difficulty==='EASY'?'badge-success':q.difficulty==='MEDIUM'?'badge-warning':'badge-danger'}`}>{q.difficulty}</span>
                     <span className="badge badge-primary">+{q.xpReward} XP</span>
+                    {q.passMark && <span className="badge" style={{background:'#e0e7ff',color:'#3730a3',borderRadius:'999px',padding:'.2rem .65rem',fontSize:'.75rem',fontWeight:700}}>Pass: {q.passMark}%</span>}
+                    <button onClick={()=>onEdit(q.id)} style={{background:'none',border:'none',color:'#4f46e5',fontSize:'.75rem',fontWeight:700,cursor:'pointer',textDecoration:'underline',padding:0}}>✏️</button>
                   </div>
                 </div>
               ))}

@@ -9,29 +9,37 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  role          String    @default("STUDENT")
-  grade         Int       @default(6)
-  language      String    @default("en")
-  schoolId      String?
-  school        School?   @relation(fields: [schoolId], references: [id])
-  xp            Int       @default(0)
-  level         Int       @default(1)
-  streakDays    Int       @default(0)
-  lastActive    DateTime  @default(now())
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  name                  String?
+  email                 String?   @unique
+  emailVerified         DateTime?
+  image                 String?
+  password              String?
+  role                  String    @default("STUDENT")
+  grade                 Int       @default(6)
+  class                 String?
+  language              String    @default("en")
+  schoolId              String?
+  school                School?   @relation(fields: [schoolId], references: [id])
+  xp                    Int       @default(0)
+  level                 Int       @default(1)
+  streak                Int       @default(0)
+  streakDays            Int       @default(0)
+  lastLoginDate         DateTime?
+  totalDaysActive       Int       @default(0)
+  levelsCompleted       Int       @default(0)
+  lastActive            DateTime  @default(now())
+  badges                String[]  @default([]) // Array of badge IDs
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  badges        UserBadge[]
-  progress      QuestProgress[]
-  notifications Notification[]
+  accounts              Account[]
+  sessions              Session[]
+  userBadges            UserBadge[]
+  questProgress         QuestProgress[]
+  chapterProgress       ChapterProgress[]
+  dailyChallengeCompletion DailyChallengeCompletion[]
+  notifications         Notification[]
 }
 
 model Account {
@@ -101,12 +109,15 @@ model Unit {
 
 model Content {
   id          String   @id @default(cuid())
-  title       String
-  description String   @default("")
+  title       String   // English title (main)
+  titleJson   String   @default("{}") // JSON: {en: "...", hi: "..."}
+  description String   @default("") // English description (main)
+  descJson    String   @default("{}") // JSON: {en: "...", hi: "..."}
   type        String   @default("PDF") // PDF, VIDEO, AUDIO, DOCUMENT, LINK
   fileUrl     String   // path or URL
   fileName    String   @default("")
   fileSize    Int      @default(0)
+  language    String   @default("en") // Original upload language
   unitId      String
   unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
   createdBy   String   // teacher user id
@@ -116,9 +127,10 @@ model Content {
 model Quest {
   id         String @id @default(cuid())
   title      String
-  type       String @default("QUIZ")
+  type       String @default("QUIZ") // LESSON | QUIZ | BOSS
   difficulty String @default("EASY")
   xpReward   Int    @default(50)
+  passMark   Int    @default(70) // Minimum score to pass (0-100)
   timeLimit  Int    @default(300)
   unitId     String
   unit       Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
@@ -126,6 +138,39 @@ model Quest {
   order      Int    @default(0)
   createdBy  String? // teacher ID if custom
   progress   QuestProgress[]
+}
+
+model Chapter {
+  id          String @id @default(cuid())
+  chapterId   String // e.g., "m1", "p2" (from game.js CURRICULUM)
+  title       String
+  subject     String // e.g., "math", "physics"
+  type        String @default("lesson") // "lesson" | "quiz" | "boss"
+  xpReward    Int    @default(50)
+  passMark    Int    @default(70)
+  icon        String @default("📚")
+  order       Int    @default(0)
+  content     String @default("{}") // JSON: lesson content or quiz data
+  progress    ChapterProgress[]
+
+  @@unique([chapterId, subject])
+}
+
+model ChapterProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapterId   String
+  chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  status      String   @default("locked") // "locked" | "current" | "done"
+  score       Int      @default(0)
+  attempts    Int      @default(0)
+  timeSpent   Int      @default(0) // milliseconds
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, chapterId])
 }
 
 model QuestProgress {
@@ -171,4 +216,15 @@ model Notification {
   read      Boolean  @default(false)
   type      String   @default("INFO")
   createdAt DateTime @default(now())
+}
+
+model DailyChallengeCompletion {
+  id              Int      @id @default(autoincrement())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeId     String   // e.g., "dc1", "dc2"
+  xpAwarded       Int      @default(0)
+  completedDate   DateTime @default(now())
+
+  @@unique([userId, challengeId, completedDate])
 }
