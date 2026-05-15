@@ -21,7 +21,6 @@ interface ContentItem {
 interface ContentDisplayProps {
   content: ContentItem[]
   filter?: string
-  language?: string
 }
 
 const typeEmojis: { [key: string]: string } = {
@@ -56,16 +55,7 @@ function formatDate(date: string): string {
   })
 }
 
-function getTranslated(jsonStr: string, lang: string = 'en', fallback: string = ''): string {
-  try {
-    const obj = JSON.parse(jsonStr || '{}')
-    return obj[lang] || obj['en'] || fallback
-  } catch (e) {
-    return fallback
-  }
-}
-
-export default function ContentDisplay({ content, filter, language = 'en' }: ContentDisplayProps) {
+export default function ContentDisplay({ content, filter }: ContentDisplayProps) {
   const filteredContent = filter ? content.filter(c => c.type === filter) : content
 
   if (filteredContent.length === 0) {
@@ -79,52 +69,47 @@ export default function ContentDisplay({ content, filter, language = 'en' }: Con
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {filteredContent.map(item => {
-        const displayTitle = getTranslated(item.titleJson || '{}', language, item.title)
-        const displayDesc = getTranslated(item.descJson || '{}', language, item.description)
-        
-        return (
-          <div key={item.id} className="border rounded-lg hover:shadow-lg transition overflow-hidden">
-            <div className={`p-3 ${typeColors[item.type] || 'bg-gray-100 text-gray-700'}`}>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{typeEmojis[item.type] || '📌'}</span>
-                <span className="font-semibold text-sm">{item.type}</span>
-              </div>
-            </div>
-
-            <div className="p-4">
-              <h3 className="font-bold text-lg mb-2 line-clamp-2 text-gray-900">{displayTitle}</h3>
-              
-              {displayDesc && (
-                <p className="text-sm text-gray-700 mb-3 line-clamp-2">{displayDesc}</p>
-              )}
-
-              <div className="space-y-2 mb-4 text-sm text-gray-700">
-                <div>
-                  <span className="font-semibold text-gray-900">{item.unit.subject.name}</span> - <span className="text-gray-700">{item.unit.name}</span>
-                </div>
-                <div className="flex justify-between text-xs text-gray-600">
-                  <span>{formatDate(item.createdAt)}</span>
-                  {item.fileSize > 0 && <span>{formatFileSize(item.fileSize)}</span>}
-                </div>
-              </div>
-
-              <a
-                href={item.fileUrl}
-                target={item.type === 'LINK' ? '_blank' : undefined}
-                download={item.type !== 'LINK' && item.fileName ? true : undefined}
-                className="block w-full px-4 py-2 bg-blue-500 text-white rounded text-center hover:bg-blue-600 transition text-sm font-semibold"
-              >
-                {item.type === 'VIDEO' && 'Watch Video'}
-                {item.type === 'AUDIO' && 'Play Audio'}
-                {item.type === 'PDF' && 'View PDF'}
-                {item.type === 'DOCUMENT' && 'Download Document'}
-                {item.type === 'LINK' && 'Open Link'}
-              </a>
+      {filteredContent.map(item => (
+        <div key={item.id} className="border rounded-lg hover:shadow-lg transition overflow-hidden">
+          <div className={`p-3 ${typeColors[item.type] || 'bg-gray-100 text-gray-700'}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{typeEmojis[item.type] || '📌'}</span>
+              <span className="font-semibold text-sm">{item.type}</span>
             </div>
           </div>
-        )
-      })}
+
+          <div className="p-4">
+            <h3 className="font-bold text-lg mb-2 line-clamp-2">{item.title}</h3>
+            
+            {item.description && (
+              <p className="text-sm text-gray-600 mb-3 line-clamp-2">{item.description}</p>
+            )}
+
+            <div className="space-y-2 mb-4 text-sm text-gray-600">
+              <div>
+                <span className="font-semibold">{item.unit.subject.name}</span> - {item.unit.name}
+              </div>
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>{formatDate(item.createdAt)}</span>
+                {item.fileSize > 0 && <span>{formatFileSize(item.fileSize)}</span>}
+              </div>
+            </div>
+
+            <a
+              href={item.fileUrl}
+              target={item.type === 'LINK' ? '_blank' : undefined}
+              download={item.type !== 'LINK' && item.fileName ? true : undefined}
+              className="block w-full px-4 py-2 bg-blue-500 text-white rounded text-center hover:bg-blue-600 transition text-sm font-semibold"
+            >
+              {item.type === 'VIDEO' && 'Watch Video'}
+              {item.type === 'AUDIO' && 'Play Audio'}
+              {item.type === 'PDF' && 'View PDF'}
+              {item.type === 'DOCUMENT' && 'Download Document'}
+              {item.type === 'LINK' && 'Open Link'}
+            </a>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

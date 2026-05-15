@@ -3,10 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
-import { OfflineStatusBanner } from "@/components/OfflineStatusBanner";
-import { SyncToast } from "@/components/SyncToast";
 import { Confetti } from "@/components/ui/Confetti";
-import { ClientInit } from "@/components/ClientInit";
 
 export const metadata: Metadata = {
   title: "VidyaQuest — Level Up Your Learning",
@@ -38,10 +35,7 @@ export default function RootLayout({
       <body className="antialiased">
         <SessionProvider>
           <ThemeProvider>
-            <ClientInit />
             <OfflineBanner />
-            <OfflineStatusBanner />
-            <SyncToast />
             <Confetti />
             {children}
           </ThemeProvider>

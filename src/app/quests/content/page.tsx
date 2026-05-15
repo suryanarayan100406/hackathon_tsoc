@@ -12,7 +12,6 @@ export default function StudentContentPage() {
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState('')
   const [subjectFilter, setSubjectFilter] = useState('')
-  const [language, setLanguage] = useState('en')
   const [userGrade, setUserGrade] = useState(8)
 
   useEffect(() => {
@@ -27,11 +26,9 @@ export default function StudentContentPage() {
       .then(r => r.json())
       .then(d => {
         if (d.user?.grade) setUserGrade(d.user.grade)
-        if (d.subjects && Array.isArray(d.subjects)) {
-          setSubjects(d.subjects)
-        }
+        if (d.subjects) setSubjects(d.subjects)
       })
-      .catch(err => console.error('Error loading dashboard:', err))
+      .catch(console.error)
   }, [status])
 
   // Fetch content based on filter
@@ -62,27 +59,15 @@ export default function StudentContentPage() {
 
         {/* Filters */}
         <div style={{display:'flex',gap:'1rem',marginBottom:'2rem',flexWrap:'wrap'}}>
-          <div style={{minWidth:'200px'}}>
-            <label style={{display:'block',fontSize:'.85rem',fontWeight:600,marginBottom:'.5rem',color:'#6b7280'}}>Language</label>
-            <select 
-              value={language} 
-              onChange={(e) => setLanguage(e.target.value)}
-              style={{width:'100%',padding:'8px 12px',border:'2px solid #e0e7ff',borderRadius:'8px',outline:'none',fontWeight:500}}
-            >
-              <option value="en">🇬🇧 English</option>
-              <option value="hi">🇮🇳 Hindi / हिंदी</option>
-            </select>
-          </div>
-
-          <div style={{minWidth:'200px'}}>
+          <div>
             <label style={{display:'block',fontSize:'.85rem',fontWeight:600,marginBottom:'.5rem',color:'#6b7280'}}>Subject</label>
             <select 
               value={subjectFilter} 
               onChange={(e) => setSubjectFilter(e.target.value)}
-              style={{width:'100%',padding:'8px 12px',border:'2px solid #e0e7ff',borderRadius:'8px',outline:'none',fontWeight:500}}
+              style={{padding:'8px 12px',border:'2px solid #e0e7ff',borderRadius:'8px',outline:'none',fontWeight:500}}
             >
               <option value="">All Subjects</option>
-              {subjects && subjects.map((s: any) => (
+              {subjects.map(s => (
                 <option key={s.slug} value={s.slug}>
                   {s.icon} {s.name}
                 </option>
@@ -90,12 +75,12 @@ export default function StudentContentPage() {
             </select>
           </div>
 
-          <div style={{minWidth:'200px'}}>
+          <div>
             <label style={{display:'block',fontSize:'.85rem',fontWeight:600,marginBottom:'.5rem',color:'#6b7280'}}>Type</label>
             <select 
               value={typeFilter} 
               onChange={(e) => setTypeFilter(e.target.value)}
-              style={{width:'100%',padding:'8px 12px',border:'2px solid #e0e7ff',borderRadius:'8px',outline:'none',fontWeight:500}}
+              style={{padding:'8px 12px',border:'2px solid #e0e7ff',borderRadius:'8px',outline:'none',fontWeight:500}}
             >
               <option value="">All Types</option>
               <option value="PDF">📄 PDF</option>
@@ -114,7 +99,7 @@ export default function StudentContentPage() {
             <p style={{color:'#6b7280'}}>Loading content...</p>
           </div>
         ) : (
-          <ContentDisplay content={filteredContent} filter={typeFilter ? typeFilter : undefined} language={language} />
+          <ContentDisplay content={filteredContent} filter={typeFilter ? typeFilter : undefined} />
         )}
       </div>
     </div>
